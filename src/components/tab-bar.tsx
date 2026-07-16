@@ -1,19 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { COLORS } from '@/constants/theme';
+import { useEffect, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { COLORS } from "@/constants/theme";
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const ICONS: Record<string, { active: IconName; inactive: IconName }> = {
-  index: { active: 'chatbubbles', inactive: 'chatbubbles-outline' },
-  users: { active: 'people', inactive: 'people-outline' },
-  settings: { active: 'settings', inactive: 'settings-outline' },
-  profile: { active: 'person-circle', inactive: 'person-circle-outline' },
+  index: { active: "chatbubbles", inactive: "chatbubbles-outline" },
+  users: { active: "people", inactive: "people-outline" },
+  settings: { active: "settings", inactive: "settings-outline" },
+  profile: { active: "person-circle", inactive: "person-circle-outline" },
 };
 
-export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+export function TabBar({
+  state,
+  descriptors,
+  navigation,
+  insets,
+}: BottomTabBarProps) {
   const routeCount = state.routes.length;
   const [pillWidth, setPillWidth] = useState(0);
   const itemWidth = pillWidth / routeCount;
@@ -49,7 +54,9 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
                   {
                     translateX: indicatorAnim.interpolate({
                       inputRange: state.routes.map((_, i) => i),
-                      outputRange: state.routes.map((_, i) => i * itemWidth + 4),
+                      outputRange: state.routes.map(
+                        (_, i) => i * itemWidth + 4,
+                      ),
                     }),
                   },
                 ],
@@ -63,11 +70,11 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
           const focused = state.index === index;
           const icons = ICONS[route.name] ?? ICONS.index;
           const label =
-            typeof options.title === 'string' ? options.title : route.name;
+            typeof options.title === "string" ? options.title : route.name;
 
           function onPress() {
             const event = navigation.emit({
-              type: 'tabPress',
+              type: "tabPress",
               target: route.key,
               canPreventDefault: true,
             });
@@ -116,7 +123,7 @@ function TabItem({
 
   const labelColor = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0.45)', '#ffffff'],
+    outputRange: ["rgba(255,255,255,0.45)", "#ffffff"],
   });
 
   return (
@@ -124,7 +131,7 @@ function TabItem({
       <Ionicons
         name={icon}
         size={22}
-        color={focused ? '#ffffff' : 'rgba(255,255,255,0.45)'}
+        color={focused ? "#ffffff" : "rgba(255,255,255,0.45)"}
       />
       <Animated.Text
         numberOfLines={1}
@@ -138,40 +145,40 @@ function TabItem({
 
 const styles = StyleSheet.create({
   wrapper: {
-    position: 'absolute',
+    position: "absolute",
     left: 20,
     right: 20,
   },
   pill: {
-    flexDirection: 'row',
+    flexDirection: "row",
     height: 64,
     borderRadius: 32,
     backgroundColor: `rgba(${COLORS.backgroundRgb}, 0.94)`,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000000',
+    borderColor: "rgba(255,255,255,0.08)",
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   indicator: {
-    position: 'absolute',
+    position: "absolute",
     top: 6,
     left: 0,
     height: 52,
     borderRadius: 100,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   item: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 2,
   },
   label: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

@@ -33,8 +33,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar",
-      "expo-image",
       [
         "expo-notifications",
         {
@@ -48,7 +46,17 @@
           "cameraPermission": "Vloq Chats needs access to your camera to take photos."
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Vloq Chats needs access to your photos to show your gallery in chat.",
+          "savePhotosPermission": "Vloq Chats needs access to save photos to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

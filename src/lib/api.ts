@@ -3,7 +3,7 @@ import { getToken, clearAuth } from "@/lib/storage";
 import { router } from "expo-router";
 
 const API_URLS_BY_ENVIRONMENT: Record<string, string> = {
-  LOCAL: "http://localhost:4000/",
+  LOCAL: "https://api-chat.butterflyai.io/",
   PRODUCTION: "https://api-chat.butterflyai.io/",
 };
 
