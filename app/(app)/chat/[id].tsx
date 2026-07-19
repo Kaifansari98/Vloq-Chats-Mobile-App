@@ -15,6 +15,7 @@ import {
   Animated,
   Modal,
   useWindowDimensions,
+  Easing,
 } from 'react-native';
 import {
   PanGestureHandler,
@@ -36,8 +37,10 @@ import { format } from 'date-fns';
 import { Avatar } from '@/components/ui/Avatar';
 import { TypingDots } from '@/components/typing-dots';
 import { AttachmentSheet, type PickedAttachment } from '@/components/chat/attachment-sheet';
+import { VoiceRecorderBar, type RecordedVoiceFile } from '@/components/chat/voice-recorder';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { COLORS } from '@/constants/theme';
-import { formatDateDivider, formatFileSize } from '@/lib/utils';
+import { formatDateDivider, formatFileSize, getInitials } from '@/lib/utils';
 import { getSocket } from '@/lib/socket';
 import { useChatSocketState } from '@/hooks/use-chat-socket';
 import {
@@ -191,6 +194,225 @@ function PdfPreview({ uri }: { uri: string }) {
       javaScriptEnabled
       originWhitelist={['*']}
     />
+  );
+}
+
+function formatAudioDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+const AUDIO_BAR_COUNT = 48;
+const AUDIO_BAR_MIN_WIDTH = 2;
+const AUDIO_BAR_MAX_WIDTH = 3;
+const AUDIO_BAR_GAP = 1.5;
+
+function generateAudioBars(seed: number, count: number): number[] {
+  let state = seed || 1;
+  const rand = () => {
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return Math.abs(state % 1000) / 1000;
+  };
+
+  return Array.from({ length: count }, (_, index) => {
+    const envelope = Math.sin((index / Math.max(1, count - 1)) * Math.PI);
+    return 0.12 + envelope * 0.55 + rand() * 0.33;
+  });
+}
+
+function AudioMessageBubble({
+  attachment,
+  isOwn,
+  senderName,
+  senderProfilePicUrl,
+  createdAt,
+  deliveryStatus,
+}: {
+  attachment: MessageAttachment;
+  isOwn: boolean;
+  senderName: string;
+  senderProfilePicUrl?: string | null;
+  createdAt: string;
+  deliveryStatus: DirectMessage['status'];
+}) {
+  const { width: screenWidth } = useWindowDimensions();
+  const player = useAudioPlayer(attachment.url);
+  const status = useAudioPlayerStatus(player);
+  const [waveformWidth, setWaveformWidth] = useState(0);
+  const scrubberX = useRef(new Animated.Value(0)).current;
+  const barCount = useMemo(() => {
+    if (!waveformWidth) return AUDIO_BAR_COUNT;
+    const capacity = Math.floor((waveformWidth + AUDIO_BAR_GAP) / (AUDIO_BAR_MIN_WIDTH + AUDIO_BAR_GAP));
+    return Math.max(18, Math.min(AUDIO_BAR_COUNT, capacity));
+  }, [waveformWidth]);
+  const barWidth = useMemo(() => {
+    if (!waveformWidth) return AUDIO_BAR_MAX_WIDTH;
+    const totalGapWidth = Math.max(0, barCount - 1) * AUDIO_BAR_GAP;
+    return Math.min(
+      AUDIO_BAR_MAX_WIDTH,
+      Math.max(AUDIO_BAR_MIN_WIDTH, (waveformWidth - totalGapWidth) / Math.max(1, barCount)),
+    );
+  }, [barCount, waveformWidth]);
+  const bars = useMemo(() => {
+    const seed =
+      attachment.name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) +
+      (attachment.sizeBytes % 99991);
+    return generateAudioBars(seed, barCount);
+  }, [attachment.name, attachment.sizeBytes, barCount]);
+
+  function toggle() {
+    if (status.playing) {
+      player.pause();
+    } else {
+      if (status.didJustFinish || status.currentTime >= status.duration) {
+        void player.seekTo(0);
+      }
+      player.play();
+    }
+  }
+
+  const progress = status.duration > 0 ? status.currentTime / status.duration : 0;
+  const activeBars = Math.floor(progress * bars.length);
+  const bubbleWidth =
+    status.duration > 0
+      ? Math.min(screenWidth * 0.75, Math.max(240, Math.round(180 + status.duration * 14)))
+      : Math.min(screenWidth * 0.72, 260);
+  const timeLabel = formatBubbleTime(createdAt);
+  const avatar = (
+    <View className="relative">
+      <Avatar name={senderName} url={senderProfilePicUrl} size={40} />
+      <View
+        className="absolute -bottom-0.5 -right-0.5 h-4 w-4 items-center justify-center rounded-full"
+        style={{ backgroundColor: '#34d399', borderWidth: 2, borderColor: '#1f1f1f' }}
+      >
+        <Ionicons name="mic" size={8} color="#ffffff" />
+      </View>
+    </View>
+  );
+
+  function seekTo(locationX: number) {
+    if (!status.duration || status.duration <= 0 || !waveformWidth) return;
+    const ratio = Math.max(0, Math.min(1, locationX / waveformWidth));
+    void player.seekTo(ratio * status.duration);
+  }
+
+  useEffect(() => {
+    const targetX = waveformWidth * Math.min(1, Math.max(0, progress));
+    Animated.timing(scrubberX, {
+      toValue: targetX,
+      duration: 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [progress, scrubberX, waveformWidth]);
+
+  return (
+    <View
+      className={`mb-1.5 flex-row items-center gap-2.5 px-3 py-2.5 ${
+        isOwn
+          ? 'rounded-2xl rounded-tr-sm bg-bubbleSent'
+          : 'rounded-2xl rounded-tl-sm bg-bubbleReceived'
+      }`}
+      style={{
+        width: bubbleWidth,
+      }}
+    >
+      {isOwn ? avatar : null}
+
+      <Pressable
+        onPress={toggle}
+        className="h-8 w-8 items-center justify-center rounded-full bg-white/15"
+      >
+        <Ionicons
+          name={status.playing ? 'pause' : 'play'}
+          size={15}
+          color="#ffffff"
+          style={!status.playing ? { marginLeft: 1 } : undefined}
+        />
+      </Pressable>
+
+      <View
+        className="min-w-0 flex-1"
+        style={{
+          paddingLeft: isOwn ? 2 : 0,
+          paddingRight: isOwn ? 0 : 6,
+        }}
+      >
+        <Pressable
+          onPress={(event) => seekTo(event.nativeEvent.locationX)}
+          onLayout={(event) => setWaveformWidth(event.nativeEvent.layout.width)}
+          className="relative h-8 justify-end"
+        >
+          <View className="h-8 flex-row items-end">
+            {bars.map((height, index) => {
+              const isActive = index < activeBars;
+              const isPlayhead = status.playing && index === activeBars && index < bars.length;
+              const barHeight = Math.round(Math.max(4, height * 24));
+
+              return (
+                <View
+                  key={`${attachment.uuid}-${index}`}
+                  style={{
+                    width: barWidth,
+                    height: barHeight,
+                    borderRadius: 9999,
+                    marginRight: index === bars.length - 1 ? 0 : AUDIO_BAR_GAP,
+                    backgroundColor: isPlayhead
+                      ? '#ffffff'
+                      : isActive
+                        ? 'rgba(255,255,255,0.92)'
+                        : 'rgba(255,255,255,0.26)',
+                  }}
+                />
+              );
+            })}
+          </View>
+
+          {status.duration > 0 ? (
+            <Animated.View
+              pointerEvents="none"
+              className="absolute top-1/2 h-2.5 w-2.5 rounded-full bg-white"
+              style={{
+                transform: [{ translateX: scrubberX }],
+                left: 0,
+                marginTop: -5,
+                marginLeft: -5,
+              }}
+            />
+          ) : null}
+        </Pressable>
+
+        <View className="mt-1 flex-row items-center justify-between px-0.5">
+          <Text className="text-[10px] font-medium tabular-nums text-white/60">
+            {formatAudioDuration(status.currentTime || status.duration)}
+          </Text>
+          <View className="flex-row items-center gap-1.5">
+            <Text className="text-[10px] tabular-nums text-white/40">{timeLabel}</Text>
+            {isOwn ? (
+              <Ionicons
+                name={deliveryStatus === 'read' ? 'checkmark-done' : 'checkmark'}
+                size={13}
+                color={deliveryStatus === 'read' ? '#60a5fa' : 'rgba(255,255,255,0.55)'}
+              />
+            ) : null}
+            <Pressable
+              onPress={() => void Linking.openURL(attachment.url)}
+              hitSlop={6}
+              className="h-5 w-5 items-center justify-center rounded-full"
+            >
+              <Ionicons name="download-outline" size={13} color="rgba(255,255,255,0.45)" />
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      {!isOwn ? avatar : null}
+    </View>
   );
 }
 
@@ -509,6 +731,7 @@ const SWIPE_REPLY_MAX = 76;
 function MessageBubble({
   message,
   isOwn,
+  senderProfilePicUrl,
   showSenderName,
   topGapClassName,
   onReply,
@@ -519,6 +742,7 @@ function MessageBubble({
 }: {
   message: DirectMessage;
   isOwn: boolean;
+  senderProfilePicUrl?: string | null;
   showSenderName: boolean;
   topGapClassName: string;
   onReply: (message: DirectMessage) => void;
@@ -527,6 +751,7 @@ function MessageBubble({
   onJumpToMessage: (messageUuid: string) => void;
   isHighlighted: boolean;
 }) {
+  const { width: screenWidth } = useWindowDimensions();
   const translateX = useRef(new Animated.Value(0)).current;
   const hasTriggeredHapticRef = useRef(false);
   const highlightOpacity = useRef(new Animated.Value(0)).current;
@@ -583,6 +808,15 @@ function MessageBubble({
     (attachment) =>
       attachment.attachmentType !== 'IMAGE' && !attachment.mimeType?.startsWith('audio/')
   );
+  const audioAttachment = message.attachments.find((attachment) =>
+    attachment.mimeType?.startsWith('audio/')
+  );
+  const isAudioOnlyMessage =
+    Boolean(audioAttachment) &&
+    imageAttachments.length === 0 &&
+    !fileAttachment &&
+    !message.content &&
+    !message.replyTo;
 
   const replyPreview = (() => {
     if (!message.replyTo) return null;
@@ -597,6 +831,7 @@ function MessageBubble({
         fileColor: null,
         thumbnailUri: originalImages[0]?.url ?? null,
         thumbnailKind: 'image' as const,
+        isAudio: false,
       };
     }
     if (message.replyTo.attachmentType === 'FILE') {
@@ -613,15 +848,17 @@ function MessageBubble({
         thumbnailUri:
           originalFile && isPdfMimeType(originalFile.mimeType) ? originalFile.url : null,
         thumbnailKind: 'pdf' as const,
+        isAudio: false,
       };
     }
     if (message.replyTo.attachmentType === 'AUDIO') {
       return {
         icon: 'mic' as const,
-        label: 'Audio',
+        label: 'Voice message',
         fileColor: null,
         thumbnailUri: null,
         thumbnailKind: null,
+        isAudio: true,
       };
     }
     return {
@@ -630,6 +867,7 @@ function MessageBubble({
       fileColor: null,
       thumbnailUri: null,
       thumbnailKind: null,
+      isAudio: false,
     };
   })();
 
@@ -663,15 +901,26 @@ function MessageBubble({
 
           <Pressable onLongPress={() => onReply(message)}>
             <View
-              className={`overflow-hidden rounded-2xl px-3 py-2 ${
-                isOwn ? 'rounded-tr-sm bg-bubbleSent' : 'rounded-tl-sm bg-bubbleReceived'
-              }`}
+              className={
+                isAudioOnlyMessage
+                  ? 'overflow-visible'
+                  : `overflow-hidden rounded-2xl px-3 py-2 ${
+                      isOwn ? 'rounded-tr-sm bg-bubbleSent' : 'rounded-tl-sm bg-bubbleReceived'
+                    }`
+              }
+              style={
+                message.replyTo && !isAudioOnlyMessage
+                  ? { minWidth: Math.min(screenWidth * 0.56, 280) }
+                  : undefined
+              }
             >
-              <Animated.View
-                pointerEvents="none"
-                className="absolute inset-0 bg-white"
-                style={{ opacity: highlightOpacity }}
-              />
+              {!isAudioOnlyMessage ? (
+                <Animated.View
+                  pointerEvents="none"
+                  className="absolute inset-0 bg-white"
+                  style={{ opacity: highlightOpacity }}
+                />
+              ) : null}
 
               {showSenderName ? (
                 <Text className="mb-1 text-[11px] font-semibold text-blue-400">
@@ -682,22 +931,33 @@ function MessageBubble({
               {message.replyTo ? (
                 <Pressable
                   onPress={() => onJumpToMessage(message.replyTo!.uuid)}
-                  className={`-mx-2 mb-2 flex-row items-stretch overflow-hidden rounded-lg ${
+                  className={`-mx-2 mb-2 flex-row items-stretch overflow-hidden rounded-2xl ${
                     showSenderName ? 'mt-0' : '-mt-1'
-                  } ${isOwn ? 'bg-white/15' : 'bg-white/8'}`}
+                  }`}
+                  style={{
+                    backgroundColor: isOwn ? '#2f2f2f' : '#3a3a3a',
+                  }}
                 >
-                  <View className={`w-1 ${isOwn ? 'bg-white/70' : 'bg-blue-400'}`} />
-                  <View className="min-w-0 grow shrink justify-center px-2 py-1.5">
+                  <View
+                    className={`w-1.5 self-stretch ${isOwn ? 'bg-[#ff5c8a]' : 'bg-blue-400'}`}
+                  />
+                  <View
+                    className="min-w-0 grow shrink justify-center px-3 py-2.5"
+                  >
                     <Text
                       numberOfLines={1}
-                      className={`text-[11px] font-semibold ${
-                        isOwn ? 'text-white/90' : 'text-blue-400'
+                      className={`font-semibold ${
+                        replyPreview?.isAudio
+                          ? 'text-[13px] text-[#ff7d9e]'
+                          : isOwn
+                            ? 'text-[13px] text-[#ff7d9e]'
+                            : 'text-[13px] text-blue-400'
                       }`}
                     >
                       {message.replyTo.senderName}
                     </Text>
                     {replyPreview?.icon ? (
-                      <View className="mt-0.5 flex-row items-center gap-1.5">
+                      <View className="mt-1 flex-row items-center gap-1.5">
                         {replyPreview.fileColor ? (
                           <View
                             className="h-4 w-4 items-center justify-center rounded"
@@ -708,13 +968,19 @@ function MessageBubble({
                         ) : (
                           <Ionicons
                             name={replyPreview.icon}
-                            size={11}
-                            color={isOwn ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.5)'}
+                            size={replyPreview?.isAudio ? 18 : 11}
+                            color={replyPreview?.isAudio ? 'rgba(255,255,255,0.85)' : isOwn ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.5)'}
                           />
                         )}
                         <Text
                           numberOfLines={1}
-                          className={`flex-1 text-[11px] ${isOwn ? 'text-white/65' : 'text-white/50'}`}
+                          className={`flex-1 ${
+                            replyPreview?.isAudio
+                              ? 'text-[12px] text-white/70'
+                              : isOwn
+                                ? 'text-[12px] text-white/70'
+                                : 'text-[12px] text-white/70'
+                          }`}
                         >
                           {replyPreview.label}
                         </Text>
@@ -722,14 +988,17 @@ function MessageBubble({
                     ) : (
                       <Text
                         numberOfLines={2}
-                        className={`text-[11px] ${isOwn ? 'text-white/65' : 'text-white/50'}`}
+                        className="mt-1 text-[12px] text-white/70"
                       >
                         {replyPreview?.label}
                       </Text>
                     )}
                   </View>
                   {replyPreview?.thumbnailUri ? (
-                    <View className="h-14 w-14 shrink-0 overflow-hidden bg-white/10">
+                    <View
+                      className="h-14 w-14 shrink-0 overflow-hidden"
+                      style={{ backgroundColor: '#1f1f1f' }}
+                    >
                       {replyPreview.thumbnailKind === 'pdf' ? (
                         <PdfPreview uri={replyPreview.thumbnailUri} />
                       ) : (
@@ -793,24 +1062,37 @@ function MessageBubble({
                 </Pressable>
               ) : null}
 
+              {audioAttachment ? (
+                <AudioMessageBubble
+                  attachment={audioAttachment}
+                  isOwn={isOwn}
+                  senderName={message.senderName}
+                  senderProfilePicUrl={senderProfilePicUrl}
+                  createdAt={message.createdAt}
+                  deliveryStatus={message.status}
+                />
+              ) : null}
+
               {message.content ? (
                 <Text className={`text-[15px] ${isOwn ? 'text-white' : 'text-white/95'}`}>
                   {message.content}
                 </Text>
               ) : null}
 
-              <View className="mt-1 flex-row items-center justify-end gap-1">
-                <Text className={`text-[10px] ${isOwn ? 'text-white/70' : 'text-white/40'}`}>
-                  {formatBubbleTime(message.createdAt)}
-                </Text>
-                {isOwn ? (
-                  <Ionicons
-                    name={message.status === 'read' ? 'checkmark-done' : 'checkmark'}
-                    size={14}
-                    color={message.status === 'read' ? '#60a5fa' : 'rgba(255,255,255,0.55)'}
-                  />
-                ) : null}
-              </View>
+              {!isAudioOnlyMessage ? (
+                <View className="mt-1 flex-row items-center justify-end gap-1">
+                  <Text className={`text-[10px] ${isOwn ? 'text-white/70' : 'text-white/40'}`}>
+                    {formatBubbleTime(message.createdAt)}
+                  </Text>
+                  {isOwn ? (
+                    <Ionicons
+                      name={message.status === 'read' ? 'checkmark-done' : 'checkmark'}
+                      size={14}
+                      color={message.status === 'read' ? '#60a5fa' : 'rgba(255,255,255,0.55)'}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           </Pressable>
         </Animated.View>
@@ -846,6 +1128,9 @@ export default function ChatScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isAttachSheetVisible, setIsAttachSheetVisible] = useState(false);
+  const [voiceRecorderPhase, setVoiceRecorderPhase] = useState<'idle' | 'recording' | 'paused'>(
+    'idle'
+  );
   const [imageViewer, setImageViewer] = useState<{ message: DirectMessage; index: number } | null>(
     null
   );
@@ -1088,8 +1373,48 @@ export default function ChatScreen() {
     );
   }
 
+  function handleVoiceMessageComplete(file: RecordedVoiceFile) {
+    stopTyping();
+    const uploadMutation = isGroup ? uploadGroup : uploadDirect;
+    uploadMutation.mutate(
+      {
+        content: '',
+        files: [file],
+        replyToMessageUuid: replyTo?.uuid,
+      },
+      {
+        onSuccess: () => {
+          setReplyTo(null);
+        },
+        onError: (error) => {
+          const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+          console.error('Failed to send voice message', file, JSON.stringify(responseData));
+          const message =
+            (responseData as { message?: string | string[] })?.message ??
+            'Could not send the voice message. Please try again.';
+          Alert.alert('Voice message failed', Array.isArray(message) ? message.join('\n') : message);
+        },
+      }
+    );
+  }
+
   const hasContent = content.trim().length > 0 || Boolean(pickedAttachment);
   const canSend = hasContent && !isSending && !isUploading;
+  const replyToIsOwn = replyTo?.isOwnMessage ?? false;
+  const replyPreviewText = (() => {
+    if (!replyTo) return '';
+    if (replyTo.attachments.some((attachment) => attachment.mimeType?.startsWith('audio/'))) {
+      return 'Voice message';
+    }
+    if (replyTo.attachments.some((attachment) => attachment.attachmentType === 'IMAGE')) {
+      return 'Photo';
+    }
+    if (replyTo.attachments.length > 0) {
+      const file = replyTo.attachments[0];
+      return file.name || 'Document';
+    }
+    return replyTo.content ?? 'Message';
+  })();
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -1221,6 +1546,7 @@ export default function ChatScreen() {
                 <MessageBubble
                   message={message}
                   isOwn={isOwn}
+                  senderProfilePicUrl={!isOwn && !isGroup ? profilePicUrl : null}
                   showSenderName={isGroup && !isOwn}
                   topGapClassName={topGap}
                   onReply={handleReply}
@@ -1258,19 +1584,40 @@ export default function ChatScreen() {
         )}
 
         {replyTo ? (
-          <View className="flex-row items-center gap-3 border-t border-white/8 bg-white/5 px-4 py-2.5">
-            <View className="w-1 self-stretch rounded-full bg-blue-400" />
-            <View className="min-w-0 flex-1">
-              <Text className="text-[13px] font-semibold text-blue-400">
-                {replyTo.senderName}
-              </Text>
-              <Text numberOfLines={1} className="mt-0.5 text-[13px] text-white/60">
-                {replyTo.content ?? 'Message'}
-              </Text>
+          <View className="border-t border-white/12 bg-[#111111]">
+            <View className="flex-row items-center px-0 py-0">
+              <View
+                className="mr-4 self-stretch"
+                style={{
+                  width: 6,
+                  backgroundColor: replyToIsOwn ? '#ff5c8a' : '#4d9dff',
+                }}
+              />
+              <View className="min-w-0 flex-1 py-3 pr-3">
+                <Text
+                  numberOfLines={1}
+                  className="text-[15px] font-semibold"
+                  style={{ color: replyToIsOwn ? '#ff7d9e' : '#4d9dff' }}
+                >
+                  {replyTo.senderName}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  className="mt-0.5 text-[13px]"
+                  style={{ color: 'rgba(255,255,255,0.88)' }}
+                >
+                  {replyPreviewText}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setReplyTo(null)}
+                hitSlop={8}
+                className="mr-4 h-10 w-10 items-center justify-center rounded-full"
+                style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.92)' }}
+              >
+                <Ionicons name="close" size={18} color="#ffffff" />
+              </Pressable>
             </View>
-            <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
-              <Ionicons name="close-circle" size={22} color="rgba(255,255,255,0.35)" />
-            </Pressable>
           </View>
         ) : null}
 
@@ -1297,32 +1644,47 @@ export default function ChatScreen() {
         ) : null}
 
         <View
-          className="flex-row items-end gap-2 border-t border-white/15 px-3 py-2"
+          className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 py-2"
           style={{ paddingBottom: isKeyboardVisible ? 10 : Math.max(insets.bottom, 8) }}
         >
-          <Pressable
-            onPress={handleAttachPress}
-            hitSlop={8}
-            className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
-          >
-            <Ionicons name="add" size={24} color="rgba(255,255,255,0.7)" />
-          </Pressable>
+          {voiceRecorderPhase === 'idle' ? (
+            <>
+              <Pressable
+                onPress={handleAttachPress}
+                hitSlop={8}
+                className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
+              >
+                <Ionicons name="add" size={24} color="rgba(255,255,255,0.7)" />
+              </Pressable>
 
-          <View className="min-h-10 max-h-28 flex-1 justify-center rounded-3xl bg-white/10 px-4 py-2">
-            <TextInput
-              ref={textInputRef}
-              value={content}
-              onChangeText={handleContentChange}
-              placeholder="Type a message..."
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              multiline
-              textAlignVertical="center"
-              style={{ paddingVertical: 0 }}
-              className="text-[15px] text-white"
-            />
-          </View>
+              <View className="min-h-10 max-h-28 flex-1 flex-row items-center rounded-3xl bg-white/10 px-4 py-2">
+                {replyTo ? (
+                  <View
+                    className="mr-3 self-stretch rounded-full"
+                    style={{
+                      width: 4,
+                      backgroundColor: '#d1d5db',
+                    }}
+                  />
+                ) : null}
+                <TextInput
+                  ref={textInputRef}
+                  value={content}
+                  onChangeText={handleContentChange}
+                  placeholder="Type a message..."
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  multiline
+                  textAlignVertical="center"
+                  selectionColor="#d1d5db"
+                  cursorColor="#d1d5db"
+                  style={{ paddingVertical: 0 }}
+                  className="flex-1 text-[15px] text-white"
+                />
+              </View>
+            </>
+          ) : null}
 
-          {hasContent ? (
+          {voiceRecorderPhase === 'idle' && hasContent ? (
             <Pressable
               onPress={handleSend}
               disabled={!canSend}
@@ -1342,19 +1704,19 @@ export default function ChatScreen() {
             </Pressable>
           ) : (
             <>
-              <Pressable
-                onPress={() => void pickImage('camera')}
-                hitSlop={8}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
-              >
-                <Ionicons name="camera-outline" size={23} color="rgba(255,255,255,0.7)" />
-              </Pressable>
-              <Pressable
-                hitSlop={8}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
-              >
-                <Ionicons name="mic-outline" size={23} color="rgba(255,255,255,0.7)" />
-              </Pressable>
+              {voiceRecorderPhase === 'idle' ? (
+                <Pressable
+                  onPress={() => void pickImage('camera')}
+                  hitSlop={8}
+                  className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
+                >
+                  <Ionicons name="camera-outline" size={23} color="rgba(255,255,255,0.7)" />
+                </Pressable>
+              ) : null}
+              <VoiceRecorderBar
+                onSend={handleVoiceMessageComplete}
+                onPhaseChange={setVoiceRecorderPhase}
+              />
             </>
           )}
         </View>

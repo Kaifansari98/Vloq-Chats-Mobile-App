@@ -56,7 +56,12 @@
       ],
       "expo-secure-store",
       "expo-font",
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Vloq Chats needs access to your microphone to record voice messages."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
