@@ -30,7 +30,9 @@ export function AttachmentSheet({
   onPickDocument: () => void;
   onSelectAsset: (attachment: PickedAttachment) => void;
 }) {
-  const [permission, requestPermission] = MediaLibrary.usePermissions();
+  const [permission, requestPermission] = MediaLibrary.usePermissions({
+    granularPermissions: ['photo'],
+  });
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
   const [isLoadingAssets, setIsLoadingAssets] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
