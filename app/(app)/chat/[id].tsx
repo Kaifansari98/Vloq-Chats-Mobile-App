@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -55,6 +55,12 @@ import {
   useUploadGroupMessage,
 } from '@/hooks/use-group-messages';
 import type { DirectMessage, MessageAttachment } from '@/hooks/use-direct-messages';
+import { MessageActionsSheet } from '@/components/chat/message-actions';
+import { ForwardPicker } from '@/components/chat/forward-picker';
+import { PinnedBanner } from '@/components/chat/pinned-banner';
+import { MediaGallery } from '@/components/chat/media-gallery';
+import { MediaPreviewScreen } from '@/components/chat/media/media-preview-screen';
+import { usePinnedMessage } from '@/hooks/use-pinned-messages';
 
 const TYPING_STOP_DELAY = 2000;
 
@@ -736,6 +742,7 @@ function MessageBubble({
   showSenderName,
   topGapClassName,
   onReply,
+  onMessageAction,
   messagesByUuid,
   onOpenImageViewer,
   onJumpToMessage,
@@ -748,6 +755,7 @@ function MessageBubble({
   showSenderName: boolean;
   topGapClassName: string;
   onReply: (message: DirectMessage) => void;
+  onMessageAction: (message: DirectMessage) => void;
   messagesByUuid: Map<string, DirectMessage>;
   onOpenImageViewer: (message: DirectMessage, index: number) => void;
   onJumpToMessage: (messageUuid: string) => void;
@@ -771,24 +779,51 @@ function MessageBubble({
     }
   }, [isHighlighted, highlightOpacity]);
 
+  function getSwipeDistance(translationX: number) {
+    if (isOwn) {
+      return Math.max(-SWIPE_REPLY_MAX, Math.min(0, translationX));
+    }
+
+    return Math.max(0, Math.min(SWIPE_REPLY_MAX, translationX));
+  }
+
   function onGestureEvent(event: PanGestureHandlerGestureEvent) {
     const { translationX } = event.nativeEvent;
-    translateX.setValue(Math.max(0, Math.min(translationX, SWIPE_REPLY_MAX)));
+    const swipeDistance = getSwipeDistance(translationX);
+    const absoluteDistance = Math.abs(swipeDistance);
 
-    if (translationX > SWIPE_REPLY_TRIGGER && !hasTriggeredHapticRef.current) {
+    translateX.setValue(swipeDistance);
+
+    if (
+      absoluteDistance > SWIPE_REPLY_TRIGGER &&
+      !hasTriggeredHapticRef.current
+    ) {
       hasTriggeredHapticRef.current = true;
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } else if (translationX <= SWIPE_REPLY_TRIGGER && hasTriggeredHapticRef.current) {
+    } else if (
+      absoluteDistance <= SWIPE_REPLY_TRIGGER &&
+      hasTriggeredHapticRef.current
+    ) {
       hasTriggeredHapticRef.current = false;
     }
   }
 
-  function onHandlerStateChange(event: PanGestureHandlerStateChangeEvent) {
+  function onHandlerStateChange(
+    event: PanGestureHandlerStateChangeEvent
+  ) {
     if (event.nativeEvent.oldState === State.ACTIVE) {
-      if (event.nativeEvent.translationX > SWIPE_REPLY_TRIGGER) {
+      const { translationX } = event.nativeEvent;
+
+      const shouldReply = isOwn
+        ? translationX < -SWIPE_REPLY_TRIGGER
+        : translationX > SWIPE_REPLY_TRIGGER;
+
+      if (shouldReply) {
         onReply(message);
       }
+
       hasTriggeredHapticRef.current = false;
+
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
@@ -799,8 +834,10 @@ function MessageBubble({
   }
 
   const iconOpacity = translateX.interpolate({
-    inputRange: [0, SWIPE_REPLY_TRIGGER],
-    outputRange: [0, 1],
+    inputRange: isOwn
+      ? [-SWIPE_REPLY_TRIGGER, 0]
+      : [0, SWIPE_REPLY_TRIGGER],
+    outputRange: isOwn ? [1, 0] : [0, 1],
     extrapolate: 'clamp',
   });
 
@@ -879,7 +916,7 @@ function MessageBubble({
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
-        activeOffsetX={[-1000, 12]}
+        activeOffsetX={isOwn ? [-12, 1000] : [-1000, 12]}
         failOffsetY={[-8, 8]}
       >
         <Animated.View
@@ -890,7 +927,7 @@ function MessageBubble({
             pointerEvents="none"
             style={{
               position: 'absolute',
-              left: -34,
+              ...(isOwn ? { right: -34 } : { left: -34 }),
               top: '50%',
               marginTop: -13,
               opacity: iconOpacity,
@@ -902,7 +939,7 @@ function MessageBubble({
             </View>
           </Animated.View>
 
-          <Pressable onLongPress={() => onReply(message)}>
+          <Pressable onLongPress={() => onMessageAction(message)}>
             <View
               className={
                 isAudioOnlyMessage
@@ -1124,6 +1161,7 @@ export default function ChatScreen() {
   const [content, setContent] = useState('');
   const [replyTo, setReplyTo] = useState<DirectMessage | null>(null);
   const [pickedAttachment, setPickedAttachment] = useState<PickedAttachment | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<PickedAttachment | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isAttachSheetVisible, setIsAttachSheetVisible] = useState(false);
@@ -1133,28 +1171,44 @@ export default function ChatScreen() {
   const [imageViewer, setImageViewer] = useState<{ message: DirectMessage; index: number } | null>(
     null
   );
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [highlightedMessageUuid, setHighlightedMessageUuid] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // ── New feature state ──
+  const [actionMessage, setActionMessage] = useState<DirectMessage | null>(null);
+  const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
+  const [isForwardPickerVisible, setIsForwardPickerVisible] = useState(false);
+  const [isMediaGalleryVisible, setIsMediaGalleryVisible] = useState(false);
+  const { pinned, pinMessage, unpinMessage } = usePinnedMessage(conversationUuid);
+
+  const isInitialLoadRef = useRef(true);
+  const showScrollToBottomRef = useRef(false);
+
+  const scrollToBottom = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated });
+    });
+  }, []);
+
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => {
+    const showSub = Keyboard.addListener(showEvent, () => {
       setIsKeyboardVisible(true);
-      if (Platform.OS === 'android') {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
+
+      setTimeout(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      }, Platform.OS === 'android' ? 250 : 100);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setIsKeyboardVisible(false);
-      if (Platform.OS === 'android') {
-        setKeyboardHeight(0);
-        textInputRef.current?.blur();
-      }
+
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: false });
+      });
     });
     return () => {
       showSub.remove();
@@ -1230,14 +1284,20 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (rows.length === 0) return;
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: true });
-    });
-    const settleTimeout = setTimeout(() => {
-      listRef.current?.scrollToEnd({ animated: false });
-    }, 250);
-    return () => clearTimeout(settleTimeout);
-  }, [rows.length]);
+
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      scrollToBottom(false);
+      const settleTimeout = setTimeout(() => {
+        scrollToBottom(false);
+      }, 200);
+      return () => clearTimeout(settleTimeout);
+    }
+
+    if (!showScrollToBottomRef.current || lastMessage?.isOwnMessage) {
+      scrollToBottom(true);
+    }
+  }, [rows.length, lastMessage?.uuid, lastMessage?.isOwnMessage, scrollToBottom]);
 
   function emitTyping(isTyping: boolean) {
     const socket = getSocket();
@@ -1301,23 +1361,56 @@ export default function ChatScreen() {
     const result =
       source === 'library'
         ? await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          quality: 0.8,
+          mediaTypes: ['images', 'videos'],
+          quality: 1.0,
         })
         : await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          quality: 0.8,
+          mediaTypes: ['images', 'videos'],
+          quality: 1.0,
         });
 
     if (result.canceled || !result.assets?.[0]) return;
 
     const asset = result.assets[0];
-    setPickedAttachment({
+    const isVideo = asset.type === 'video' || asset.mimeType?.startsWith('video/');
+
+    setPreviewAttachment({
       uri: asset.uri,
-      name: asset.fileName ?? 'photo.jpg',
-      type: asset.mimeType ?? 'image/jpeg',
-      kind: 'image',
+      name: asset.fileName ?? (isVideo ? 'video.mp4' : 'photo.jpg'),
+      type: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+      kind: isVideo ? 'video' : 'image',
+      width: asset.width,
+      height: asset.height,
+      durationSeconds: asset.duration ? Math.round(asset.duration / 1000) : undefined,
+      sizeBytes: asset.fileSize,
+      quality: 'STANDARD',
     });
+  }
+
+  function handlePreviewSend(att: PickedAttachment, caption: string) {
+    setPreviewAttachment(null);
+    stopTyping();
+
+    const uploadMutation = isGroup ? uploadGroup : uploadDirect;
+    uploadMutation.mutate(
+      {
+        content: caption,
+        files: [att],
+        replyToMessageUuid: replyTo?.uuid,
+      },
+      {
+        onSuccess: () => {
+          setContent('');
+          setPickedAttachment(null);
+          setReplyTo(null);
+          scrollToBottom(true);
+        },
+        onError: (error) => {
+          console.error('Failed to send media', error);
+          Alert.alert('Upload failed', 'Could not upload media. Please try again.');
+        },
+      }
+    );
   }
 
   async function pickDocument() {
@@ -1346,6 +1439,54 @@ export default function ChatScreen() {
 
   function handleOpenImageViewer(message: DirectMessage, index: number) {
     setImageViewer({ message, index });
+  }
+
+  // ── New feature handlers ──
+  function handleMessageAction(message: DirectMessage) {
+    setActionMessage(message);
+    setIsActionSheetVisible(true);
+  }
+
+  function handleActionReply() {
+    if (actionMessage) handleReply(actionMessage);
+  }
+
+  function handleActionForward() {
+    setIsForwardPickerVisible(true);
+  }
+
+  function handleActionPin() {
+    if (actionMessage) void pinMessage(actionMessage);
+  }
+
+  function handleActionUnpin() {
+    void unpinMessage();
+  }
+
+  function handlePinnedBannerPress() {
+    if (pinned) handleJumpToMessage(pinned.messageUuid);
+  }
+
+  function handleMediaGalleryImage(attachments: MessageAttachment[], index: number) {
+    // Create a fake message to display in the viewer
+    if (attachments.length > 0) {
+      setIsMediaGalleryVisible(false);
+      const fakeMsg: DirectMessage = {
+        uuid: 'gallery-view',
+        conversationUuid,
+        senderId: 0,
+        senderUuid: '',
+        senderName: name,
+        content: null,
+        type: 'IMAGE',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isOwnMessage: false,
+        status: 'read',
+        attachments,
+      };
+      setImageViewer({ message: fakeMsg, index });
+    }
   }
 
   function handleJumpToMessage(messageUuid: string) {
@@ -1384,6 +1525,7 @@ export default function ChatScreen() {
             setContent('');
             setPickedAttachment(null);
             setReplyTo(null);
+            scrollToBottom(true);
           },
         }
       );
@@ -1397,6 +1539,7 @@ export default function ChatScreen() {
         onSuccess: () => {
           setContent('');
           setReplyTo(null);
+          scrollToBottom(true);
         },
       }
     );
@@ -1414,6 +1557,7 @@ export default function ChatScreen() {
       {
         onSuccess: () => {
           setReplyTo(null);
+          scrollToBottom(true);
         },
         onError: (error) => {
           const responseData = (error as { response?: { data?: unknown } })?.response?.data;
@@ -1537,6 +1681,16 @@ export default function ChatScreen() {
                     <Ionicons name="trash-outline" size={18} color="#f87171" />
                     <Text className="text-red-400 text-[15px]">Clear Chat</Text>
                   </Pressable>
+                  <Pressable
+                    className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
+                    onPress={() => {
+                      setIsMenuOpen(false);
+                      setIsMediaGalleryVisible(true);
+                    }}
+                  >
+                    <Ionicons name="images-outline" size={18} color="#ffffff" />
+                    <Text className="text-white text-[15px]">Media, links, and docs</Text>
+                  </Pressable>
                 </View>
               </Pressable>
             </Modal>
@@ -1545,15 +1699,22 @@ export default function ChatScreen() {
       </View>
 
       <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        enabled={Platform.OS === 'ios' ? true : isKeyboardVisible}
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 52 : 0}
+        enabled
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
             <Loader size={36} color="rgba(255,255,255,0.45)" />
           </View>
         ) : (
+          <>
+          <PinnedBanner
+            pinned={pinned}
+            onPress={handlePinnedBannerPress}
+            onUnpin={handleActionUnpin}
+          />
           <View className="relative flex-1 overflow-hidden">
             <Image
               source={require('../../../assets/chat-doodle-pattern.png')}
@@ -1568,14 +1729,27 @@ export default function ChatScreen() {
               ref={listRef}
               data={rows}
               keyExtractor={(row) => row.key}
-              contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 8 }}
-              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                paddingTop: 12,
+                paddingHorizontal: 8,
+                paddingBottom: 12,
+                flexGrow: 1,
+              }}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+              onContentSizeChange={() => {
+                if (isInitialLoadRef.current || !showScrollToBottomRef.current) {
+                  listRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
               onScroll={(event) => {
                 const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
                 const distanceFromBottom =
                   contentSize.height - contentOffset.y - layoutMeasurement.height;
-                setShowScrollToBottom(distanceFromBottom > 300);
+                const isFarFromBottom = distanceFromBottom > 150;
+                setShowScrollToBottom(isFarFromBottom);
+                showScrollToBottomRef.current = isFarFromBottom;
               }}
               scrollEventThrottle={100}
               onScrollToIndexFailed={(info) => {
@@ -1629,6 +1803,7 @@ export default function ChatScreen() {
                     showSenderName={isGroup && !isOwn}
                     topGapClassName={topGap}
                     onReply={handleReply}
+                    onMessageAction={handleMessageAction}
                     messagesByUuid={messagesByUuid}
                     onOpenImageViewer={handleOpenImageViewer}
                     onJumpToMessage={handleJumpToMessage}
@@ -1661,6 +1836,7 @@ export default function ChatScreen() {
               </Pressable>
             ) : null}
           </View>
+          </>
         )}
 
         {replyTo ? (
@@ -1725,7 +1901,11 @@ export default function ChatScreen() {
 
         <View
           className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 pt-3"
-          style={{ paddingBottom: isKeyboardVisible ? 16 : Math.max(insets.bottom, 16) + 8 }}
+          style={{
+            paddingBottom: isKeyboardVisible
+              ? 10
+              : Math.max(insets.bottom, 10),
+          }}
         >
           {voiceRecorderPhase === 'idle' ? (
             <>
@@ -1751,6 +1931,10 @@ export default function ChatScreen() {
                   ref={textInputRef}
                   value={content}
                   onChangeText={handleContentChange}
+                  onFocus={() => {
+                    scrollToBottom(true);
+                    setTimeout(() => scrollToBottom(true), 150);
+                  }}
                   placeholder="Type a message..."
                   placeholderTextColor="rgba(255,255,255,0.4)"
                   multiline
@@ -1821,6 +2005,65 @@ export default function ChatScreen() {
         message={imageViewer?.message ?? null}
         initialIndex={imageViewer?.index ?? 0}
         onClose={() => setImageViewer(null)}
+      />
+
+      <MessageActionsSheet
+        visible={isActionSheetVisible}
+        message={actionMessage}
+        isPinned={pinned?.messageUuid === actionMessage?.uuid}
+        onClose={() => {
+          setIsActionSheetVisible(false);
+          setActionMessage(null);
+        }}
+        onReply={handleActionReply}
+        onForward={handleActionForward}
+        onPin={handleActionPin}
+        onUnpin={handleActionUnpin}
+      />
+
+      <ForwardPicker
+        visible={isForwardPickerVisible}
+        message={actionMessage}
+        onClose={() => {
+          setIsForwardPickerVisible(false);
+          setActionMessage(null);
+        }}
+        onForwardComplete={() => {
+          Alert.alert('Forwarded', 'Message forwarded successfully!');
+        }}
+      />
+
+      <MediaGallery
+        visible={isMediaGalleryVisible}
+        messages={messages}
+        chatName={name}
+        onClose={() => setIsMediaGalleryVisible(false)}
+        onPressMedia={(attachment) => {
+          setIsMediaGalleryVisible(false);
+          const fakeMsg: DirectMessage = {
+            uuid: 'gallery-view',
+            conversationUuid,
+            senderId: 0,
+            senderUuid: '',
+            senderName: name,
+            content: null,
+            type: 'IMAGE',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isOwnMessage: false,
+            status: 'read',
+            attachments: [attachment],
+          };
+          setImageViewer({ message: fakeMsg, index: 0 });
+        }}
+        onJumpToMessage={handleJumpToMessage}
+      />
+
+      <MediaPreviewScreen
+        visible={previewAttachment !== null}
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+        onSend={handlePreviewSend}
       />
     </View>
   );

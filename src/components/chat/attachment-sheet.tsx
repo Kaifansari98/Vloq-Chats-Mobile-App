@@ -11,7 +11,12 @@ export type PickedAttachment = {
   uri: string;
   name: string;
   type: string;
-  kind: 'image' | 'file';
+  kind: 'image' | 'video' | 'file';
+  quality?: 'STANDARD' | 'HD';
+  durationSeconds?: number;
+  width?: number;
+  height?: number;
+  sizeBytes?: number;
 };
 
 type QuickActionKey = 'photos' | 'camera' | 'document' | 'contact';

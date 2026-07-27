@@ -8,6 +8,11 @@ export type MessageAttachment = {
   url: string;
   mimeType: string;
   sizeBytes: number;
+  thumbnailUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  durationSeconds?: number | null;
+  quality?: 'STANDARD' | 'HD';
 };
 
 export type DirectMessage = {
