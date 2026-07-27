@@ -1700,9 +1700,9 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 52 : 0}
-        enabled
+        enabled={Platform.OS === 'ios'}
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
