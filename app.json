@@ -61,7 +61,8 @@
         {
           "microphonePermission": "Vloq Chats needs access to your microphone to record voice messages."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

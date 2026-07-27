@@ -37,7 +37,7 @@ export function TabBar({
 
   return (
     <View
-      style={[styles.wrapper, { bottom: Math.max(insets.bottom - 14, 0) }]}
+      style={[styles.wrapper, { bottom: Math.max(insets.bottom, 0) + 2 }]}
       pointerEvents="box-none"
     >
       <View

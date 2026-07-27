@@ -8,7 +8,7 @@ const API_URLS_BY_ENVIRONMENT: Record<string, string> = {
 };
 
 const environment =
-  (process.env.EXPO_PUBLIC_ENVIRONMENT?.toUpperCase() ?? "LOCAL");
+  (process.env.EXPO_PUBLIC_ENVIRONMENT?.toUpperCase() ?? "PRODUCTION");
 
 export const API_BASE_URL =
   API_URLS_BY_ENVIRONMENT[environment] ?? API_URLS_BY_ENVIRONMENT.LOCAL;

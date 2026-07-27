@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, Modal, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, Modal, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
+import { Loader } from '../ui/Loader';
 
 const GALLERY_PAGE_SIZE = 60;
 
@@ -30,9 +31,7 @@ export function AttachmentSheet({
   onPickDocument: () => void;
   onSelectAsset: (attachment: PickedAttachment) => void;
 }) {
-  const [permission, requestPermission] = MediaLibrary.usePermissions({
-    granularPermissions: ['photo'],
-  });
+  const [permission, setPermission] = useState<MediaLibrary.PermissionResponse | null>(null);
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
   const [isLoadingAssets, setIsLoadingAssets] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
@@ -44,8 +43,16 @@ export function AttachmentSheet({
     async function loadGallery() {
       setLoadErrorMessage(null);
       let current = permission;
-      if (!current || current.status !== 'granted') {
-        current = await requestPermission();
+      try {
+        if (!current || current.status !== 'granted') {
+          const req = await MediaLibrary.requestPermissionsAsync();
+          setPermission(req);
+          current = req;
+        }
+      } catch (err) {
+        console.warn('Skipping gallery preview due to permission error:', err);
+        setLoadErrorMessage('Gallery preview unavailable in Expo Go. Use the Photos button instead.');
+        return;
       }
       if (current?.status !== 'granted') return;
 
@@ -170,7 +177,7 @@ export function AttachmentSheet({
               </View>
             ) : isLoadingAssets ? (
               <View className="items-center py-10">
-                <ActivityIndicator color="rgba(255,255,255,0.5)" />
+                <Loader size={32} color="rgba(255,255,255,0.45)" />
               </View>
             ) : loadErrorMessage ? (
               <View className="items-center px-6 py-10">
@@ -208,7 +215,7 @@ export function AttachmentSheet({
                     />
                     {selectingId === item.id ? (
                       <View className="absolute inset-0 items-center justify-center bg-black/40">
-                        <ActivityIndicator color="#ffffff" size="small" />
+                        <Loader size={18} color="#ffffff" />
                       </View>
                     ) : null}
                   </Pressable>

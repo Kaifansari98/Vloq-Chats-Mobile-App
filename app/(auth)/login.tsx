@@ -8,9 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { Loader } from '@/components/ui/Loader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AxiosError } from 'axios';
@@ -176,7 +176,7 @@ export default function LoginScreen() {
               >
                 {loginMutation.isPending ? (
                   <View className="mr-2">
-                    <ActivityIndicator color="#0f172a" size="small" />
+                    <Loader size={18} color="#0f172a" />
                   </View>
                 ) : null}
                 <Text

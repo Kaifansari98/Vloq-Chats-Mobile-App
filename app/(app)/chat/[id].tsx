@@ -7,7 +7,6 @@ import {
   FlatList,
   Image,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Keyboard,
   Linking,
@@ -17,6 +16,7 @@ import {
   useWindowDimensions,
   Easing,
 } from 'react-native';
+import { Loader } from '@/components/ui/Loader';
 import {
   PanGestureHandler,
   State,
@@ -180,7 +180,7 @@ function PdfPreview({ uri }: { uri: string }) {
   if (!base64) {
     return (
       <View className="flex-1 items-center justify-center bg-white/5">
-        <ActivityIndicator color="rgba(255,255,255,0.4)" size="small" />
+        <Loader size={20} color="rgba(255,255,255,0.4)" />
       </View>
     );
   }
@@ -232,6 +232,7 @@ function AudioMessageBubble({
   senderProfilePicUrl,
   createdAt,
   deliveryStatus,
+  isPeerOnline,
 }: {
   attachment: MessageAttachment;
   isOwn: boolean;
@@ -239,6 +240,7 @@ function AudioMessageBubble({
   senderProfilePicUrl?: string | null;
   createdAt: string;
   deliveryStatus: DirectMessage['status'];
+  isPeerOnline?: boolean;
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const player = useAudioPlayer(attachment.url);
@@ -313,11 +315,10 @@ function AudioMessageBubble({
 
   return (
     <View
-      className={`mb-1.5 flex-row items-center gap-2.5 px-3 py-2.5 ${
-        isOwn
-          ? 'rounded-2xl rounded-tr-sm bg-bubbleSent'
-          : 'rounded-2xl rounded-tl-sm bg-bubbleReceived'
-      }`}
+      className={`mb-1.5 flex-row items-center gap-2.5 px-3 py-2.5 ${isOwn
+        ? 'rounded-2xl rounded-tr-sm bg-bubbleSent'
+        : 'rounded-2xl rounded-tl-sm bg-bubbleReceived'
+        }`}
       style={{
         width: bubbleWidth,
       }}
@@ -395,7 +396,7 @@ function AudioMessageBubble({
             <Text className="text-[10px] tabular-nums text-white/40">{timeLabel}</Text>
             {isOwn ? (
               <Ionicons
-                name={deliveryStatus === 'read' ? 'checkmark-done' : 'checkmark'}
+                name={deliveryStatus === 'read' ? 'checkmark-done' : (deliveryStatus === 'sent' && isPeerOnline) ? 'checkmark-done' : 'checkmark'}
                 size={13}
                 color={deliveryStatus === 'read' ? '#60a5fa' : 'rgba(255,255,255,0.55)'}
               />
@@ -739,6 +740,7 @@ function MessageBubble({
   onOpenImageViewer,
   onJumpToMessage,
   isHighlighted,
+  isPeerOnline,
 }: {
   message: DirectMessage;
   isOwn: boolean;
@@ -750,6 +752,7 @@ function MessageBubble({
   onOpenImageViewer: (message: DirectMessage, index: number) => void;
   onJumpToMessage: (messageUuid: string) => void;
   isHighlighted: boolean;
+  isPeerOnline?: boolean;
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const translateX = useRef(new Animated.Value(0)).current;
@@ -904,9 +907,8 @@ function MessageBubble({
               className={
                 isAudioOnlyMessage
                   ? 'overflow-visible'
-                  : `overflow-hidden rounded-2xl px-3 py-2 ${
-                      isOwn ? 'rounded-tr-sm bg-bubbleSent' : 'rounded-tl-sm bg-bubbleReceived'
-                    }`
+                  : `overflow-hidden rounded-2xl px-3 py-2 ${isOwn ? 'rounded-tr-sm bg-bubbleSent' : 'rounded-tl-sm bg-bubbleReceived'
+                  }`
               }
               style={
                 message.replyTo && !isAudioOnlyMessage
@@ -931,9 +933,8 @@ function MessageBubble({
               {message.replyTo ? (
                 <Pressable
                   onPress={() => onJumpToMessage(message.replyTo!.uuid)}
-                  className={`-mx-2 mb-2 flex-row items-stretch overflow-hidden rounded-2xl ${
-                    showSenderName ? 'mt-0' : '-mt-1'
-                  }`}
+                  className={`-mx-2 mb-2 flex-row items-stretch overflow-hidden rounded-2xl ${showSenderName ? 'mt-0' : '-mt-1'
+                    }`}
                   style={{
                     backgroundColor: isOwn ? '#2f2f2f' : '#3a3a3a',
                   }}
@@ -946,13 +947,12 @@ function MessageBubble({
                   >
                     <Text
                       numberOfLines={1}
-                      className={`font-semibold ${
-                        replyPreview?.isAudio
+                      className={`font-semibold ${replyPreview?.isAudio
+                        ? 'text-[13px] text-[#ff7d9e]'
+                        : isOwn
                           ? 'text-[13px] text-[#ff7d9e]'
-                          : isOwn
-                            ? 'text-[13px] text-[#ff7d9e]'
-                            : 'text-[13px] text-blue-400'
-                      }`}
+                          : 'text-[13px] text-blue-400'
+                        }`}
                     >
                       {message.replyTo.senderName}
                     </Text>
@@ -974,13 +974,12 @@ function MessageBubble({
                         )}
                         <Text
                           numberOfLines={1}
-                          className={`flex-1 ${
-                            replyPreview?.isAudio
+                          className={`flex-1 ${replyPreview?.isAudio
+                            ? 'text-[12px] text-white/70'
+                            : isOwn
                               ? 'text-[12px] text-white/70'
-                              : isOwn
-                                ? 'text-[12px] text-white/70'
-                                : 'text-[12px] text-white/70'
-                          }`}
+                              : 'text-[12px] text-white/70'
+                            }`}
                         >
                           {replyPreview.label}
                         </Text>
@@ -1023,9 +1022,8 @@ function MessageBubble({
               {fileAttachment ? (
                 <Pressable
                   onPress={() => void Linking.openURL(fileAttachment.url)}
-                  className={`mb-1.5 w-[230px] overflow-hidden rounded-xl ${
-                    isOwn ? 'bg-white/10' : 'bg-white/8'
-                  }`}
+                  className={`mb-1.5 w-[230px] overflow-hidden rounded-xl ${isOwn ? 'bg-white/10' : 'bg-white/8'
+                    }`}
                 >
                   {isPdfMimeType(fileAttachment.mimeType) ? (
                     <View className="h-[150px] w-full bg-white">
@@ -1070,6 +1068,7 @@ function MessageBubble({
                   senderProfilePicUrl={senderProfilePicUrl}
                   createdAt={message.createdAt}
                   deliveryStatus={message.status}
+                  isPeerOnline={isPeerOnline}
                 />
               ) : null}
 
@@ -1086,7 +1085,7 @@ function MessageBubble({
                   </Text>
                   {isOwn ? (
                     <Ionicons
-                      name={message.status === 'read' ? 'checkmark-done' : 'checkmark'}
+                      name={message.status === 'read' ? 'checkmark-done' : (message.status === 'sent' && isPeerOnline) ? 'checkmark-done' : 'checkmark'}
                       size={14}
                       color={message.status === 'read' ? '#60a5fa' : 'rgba(255,255,255,0.55)'}
                     />
@@ -1134,16 +1133,29 @@ export default function ChatScreen() {
   const [imageViewer, setImageViewer] = useState<{ message: DirectMessage; index: number } | null>(
     null
   );
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [highlightedMessageUuid, setHighlightedMessageUuid] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setIsKeyboardVisible(true);
+      if (Platform.OS === 'android') {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+      if (Platform.OS === 'android') {
+        setKeyboardHeight(0);
+        textInputRef.current?.blur();
+      }
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -1198,6 +1210,23 @@ export default function ChatScreen() {
     // Only re-run when switching to a different conversation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGroup, memberId]);
+
+  // Mark incoming messages as read in real-time when active on this screen
+  const lastMessage = messages[messages.length - 1];
+  const lastMessageUuid = lastMessage?.uuid;
+  const lastMessageSenderId = lastMessage?.senderId;
+
+  useEffect(() => {
+    if (
+      !isGroup &&
+      Number.isFinite(memberId) &&
+      lastMessage &&
+      !lastMessage.isOwnMessage &&
+      lastMessage.status !== 'read'
+    ) {
+      markDirectRead.mutate(memberId);
+    }
+  }, [lastMessageUuid, lastMessageSenderId, memberId, isGroup, lastMessage?.status]);
 
   useEffect(() => {
     if (rows.length === 0) return;
@@ -1272,13 +1301,13 @@ export default function ChatScreen() {
     const result =
       source === 'library'
         ? await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            quality: 0.8,
-          })
+          mediaTypes: ['images'],
+          quality: 0.8,
+        })
         : await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            quality: 0.8,
-          });
+          mediaTypes: ['images'],
+          quality: 0.8,
+        });
 
     if (result.canceled || !result.assets?.[0]) return;
 
@@ -1452,27 +1481,77 @@ export default function ChatScreen() {
           )}
         </View>
 
-        <Pressable
-          hitSlop={8}
-          className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
-        >
-          <Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.7)" />
-        </Pressable>
-        <Pressable
-          hitSlop={8}
-          className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
-        >
-          <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.7)" />
-        </Pressable>
+        <View className="flex-row items-center gap-1">
+          <Pressable
+            hitSlop={8}
+            className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
+          >
+            <Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
+          >
+            <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+
+          <View className="relative z-50">
+            <Pressable
+              onPress={() => setIsMenuOpen(true)}
+              hitSlop={8}
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+
+            <Modal visible={isMenuOpen} transparent animationType="fade" onRequestClose={() => setIsMenuOpen(false)}>
+              <Pressable className="flex-1" onPress={() => setIsMenuOpen(false)}>
+                <View
+                  className="absolute right-3 rounded-xl bg-[#2a2a2a] py-2 w-48 border border-white/10"
+                  style={{ top: insets.top + 45, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10 }}
+                >
+                  <Pressable
+                    className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
+                    onPress={() => {
+                      setIsMenuOpen(false);
+                      Alert.alert('Search', 'Search feature coming soon!');
+                    }}
+                  >
+                    <Ionicons name="search" size={18} color="#ffffff" />
+                    <Text className="text-white text-[15px]">Search</Text>
+                  </Pressable>
+                  <Pressable
+                    className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
+                    onPress={() => {
+                      setIsMenuOpen(false);
+                      Alert.alert(
+                        'Clear Chat',
+                        'Are you sure you want to clear this chat?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Clear', style: 'destructive', onPress: () => console.log('Clear chat triggered') }
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#f87171" />
+                    <Text className="text-red-400 text-[15px]">Clear Chat</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Modal>
+          </View>
+        </View>
       </View>
 
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        enabled={Platform.OS === 'ios' ? true : isKeyboardVisible}
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color="rgba(255,255,255,0.5)" />
+            <Loader size={36} color="rgba(255,255,255,0.45)" />
           </View>
         ) : (
           <View className="relative flex-1 overflow-hidden">
@@ -1509,54 +1588,55 @@ export default function ChatScreen() {
                 }, 100);
               }}
               renderItem={({ item, index }) => {
-              if (item.kind === 'divider') {
-                return (
-                  <View className="my-3 items-center">
-                    <View className="rounded-full bg-white/8 px-3 py-1">
-                      <Text className="text-[11px] font-semibold text-white/60">
-                        {item.label}
+                if (item.kind === 'divider') {
+                  return (
+                    <View className="my-3 items-center">
+                      <View className="rounded-full bg-white/8 px-3 py-1">
+                        <Text className="text-[11px] font-semibold text-white/60">
+                          {item.label}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                }
+
+                if (item.kind === 'typing') {
+                  return (
+                    <View className="mb-1.5 mt-2 items-start">
+                      <Text className="mb-1 px-1 text-[11px] font-medium text-white/50">
+                        {typingActorLabel}
                       </Text>
+                      <View className="rounded-2xl rounded-bl-sm bg-bubbleReceived px-4 py-3">
+                        <TypingDots color={COLORS.buttonPrimary} />
+                      </View>
                     </View>
-                  </View>
-                );
-              }
+                  );
+                }
 
-              if (item.kind === 'typing') {
+                const message = item.message;
+                const isOwn = message.isOwnMessage;
+
+                const prevRow = rows[index - 1];
+                const isSameSenderAsPrev =
+                  prevRow?.kind === 'message' && prevRow.message.isOwnMessage === isOwn;
+                const topGap = isSameSenderAsPrev ? 'mt-1' : 'mt-4';
+
                 return (
-                  <View className="mb-1.5 mt-2 items-start">
-                    <Text className="mb-1 px-1 text-[11px] font-medium text-white/50">
-                      {typingActorLabel}
-                    </Text>
-                    <View className="rounded-2xl rounded-bl-sm bg-bubbleReceived px-4 py-3">
-                      <TypingDots color={COLORS.buttonPrimary} />
-                    </View>
-                  </View>
+                  <MessageBubble
+                    message={message}
+                    isOwn={isOwn}
+                    senderProfilePicUrl={!isOwn && !isGroup ? profilePicUrl : null}
+                    showSenderName={isGroup && !isOwn}
+                    topGapClassName={topGap}
+                    onReply={handleReply}
+                    messagesByUuid={messagesByUuid}
+                    onOpenImageViewer={handleOpenImageViewer}
+                    onJumpToMessage={handleJumpToMessage}
+                    isHighlighted={highlightedMessageUuid === message.uuid}
+                    isPeerOnline={isOnline}
+                  />
                 );
-              }
-
-              const message = item.message;
-              const isOwn = message.isOwnMessage;
-
-              const prevRow = rows[index - 1];
-              const isSameSenderAsPrev =
-                prevRow?.kind === 'message' && prevRow.message.isOwnMessage === isOwn;
-              const topGap = isSameSenderAsPrev ? 'mt-1' : 'mt-4';
-
-              return (
-                <MessageBubble
-                  message={message}
-                  isOwn={isOwn}
-                  senderProfilePicUrl={!isOwn && !isGroup ? profilePicUrl : null}
-                  showSenderName={isGroup && !isOwn}
-                  topGapClassName={topGap}
-                  onReply={handleReply}
-                  messagesByUuid={messagesByUuid}
-                  onOpenImageViewer={handleOpenImageViewer}
-                  onJumpToMessage={handleJumpToMessage}
-                  isHighlighted={highlightedMessageUuid === message.uuid}
-                />
-              );
-            }}
+              }}
             />
 
             {showScrollToBottom ? (
@@ -1644,8 +1724,8 @@ export default function ChatScreen() {
         ) : null}
 
         <View
-          className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 py-2"
-          style={{ paddingBottom: isKeyboardVisible ? 10 : Math.max(insets.bottom, 8) }}
+          className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 pt-3"
+          style={{ paddingBottom: isKeyboardVisible ? 16 : Math.max(insets.bottom, 16) + 8 }}
         >
           {voiceRecorderPhase === 'idle' ? (
             <>
@@ -1657,7 +1737,7 @@ export default function ChatScreen() {
                 <Ionicons name="add" size={24} color="rgba(255,255,255,0.7)" />
               </Pressable>
 
-              <View className="min-h-10 max-h-28 flex-1 flex-row items-center rounded-3xl bg-white/10 px-4 py-2">
+              <View className="min-h-[35px] max-h-28 flex-1 flex-row items-center rounded-3xl bg-white/10 px-4 py-2.5">
                 {replyTo ? (
                   <View
                     className="mr-3 self-stretch rounded-full"
@@ -1688,12 +1768,11 @@ export default function ChatScreen() {
             <Pressable
               onPress={handleSend}
               disabled={!canSend}
-              className={`h-10 w-10 items-center justify-center rounded-full ${
-                canSend ? 'bg-button-primary' : 'bg-white/10'
-              }`}
+              className={`h-10 w-10 items-center justify-center rounded-full ${canSend ? 'bg-button-primary' : 'bg-white/10'
+                }`}
             >
               {isSending || isUploading ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <Loader size={18} color="#ffffff" />
               ) : (
                 <Ionicons
                   name="send"

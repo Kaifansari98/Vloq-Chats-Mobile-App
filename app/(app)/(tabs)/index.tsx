@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -20,6 +19,7 @@ import { useDirectChats } from '@/hooks/use-direct-chats';
 import type { Chat, ChatListFilter, DirectChat } from '@/hooks/use-direct-chats';
 import { useOrganizationMembers } from '@/hooks/use-organization-members';
 import type { Member } from '@/hooks/use-organization-members';
+import { Loader } from '@/components/ui/Loader';
 
 const FILTER_TABS: Array<{ value: ChatListFilter; label: string }> = [
   { value: 'ALL', label: 'All' },
@@ -184,7 +184,7 @@ export default function ChatsScreen() {
       <View className="px-5 pb-4 pt-3">
         <Text className="text-[34px] font-extrabold text-white">Chats</Text>
 
-        <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-3">
+        <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-2">
           <Ionicons name="search" size={18} color="rgba(255,255,255,0.5)" />
           <TextInput
             value={searchInput}
@@ -225,7 +225,7 @@ export default function ChatsScreen() {
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center pb-20">
-          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+          <Loader size={30} color="rgba(255,255,255,0.45)" />
         </View>
       ) : sortedItems.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6 pb-20">

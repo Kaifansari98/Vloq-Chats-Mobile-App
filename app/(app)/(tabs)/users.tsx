@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -14,11 +13,12 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/hooks/use-auth';
 import { useChatSocketState } from '@/hooks/use-chat-socket';
 import { useOrganizationMembers } from '@/hooks/use-organization-members';
+import { Loader } from '@/components/ui/Loader';
 
 export default function UsersScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { onlineUserIds } = useChatSocketState();
+  const onlineUserIds = useChatSocketState().onlineUserIds;
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
@@ -42,7 +42,7 @@ export default function UsersScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: insets.top }} className="flex-1 bg-background">
       <View className="px-5 pb-4 pt-3">
         <Text className="text-[34px] font-extrabold text-white">Users</Text>
 
@@ -61,7 +61,7 @@ export default function UsersScreen() {
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center pb-20">
-          <ActivityIndicator color="rgba(255,255,255,0.5)" />
+          <Loader size={36} color="rgba(255,255,255,0.45)" />
         </View>
       ) : members.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6 pb-20">
