@@ -77,7 +77,7 @@ export default function WelcomeScreen() {
         </View>
 
         <Text className="mt-10 text-center text-[15px] text-white/35">
-          Terms of use  |  Privacy Policy
+          {'Terms of use  |  Privacy Policy'}
         </Text>
       </View>
     </View>

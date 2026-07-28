@@ -48,11 +48,13 @@ import {
   useSendDirectMessage,
   useUploadDirectMessage,
   useMarkDirectChatRead,
+  useEditDirectMessage,
 } from '@/hooks/use-direct-messages';
 import {
   useGroupMessages,
   useSendGroupMessage,
   useUploadGroupMessage,
+  useEditGroupMessage,
 } from '@/hooks/use-group-messages';
 import type { DirectMessage, MessageAttachment } from '@/hooks/use-direct-messages';
 import { MessageActionsSheet } from '@/components/chat/message-actions';
@@ -1117,6 +1119,11 @@ function MessageBubble({
 
               {!isAudioOnlyMessage ? (
                 <View className="mt-1 flex-row items-center justify-end gap-1">
+                  {message.isEdited ? (
+                    <Text className={`text-[10px] italic ${isOwn ? 'text-white/60' : 'text-white/40'}`}>
+                      edited
+                    </Text>
+                  ) : null}
                   <Text className={`text-[10px] ${isOwn ? 'text-white/70' : 'text-white/40'}`}>
                     {formatBubbleTime(message.createdAt)}
                   </Text>
@@ -1179,6 +1186,7 @@ export default function ChatScreen() {
 
   // ── New feature state ──
   const [actionMessage, setActionMessage] = useState<DirectMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<DirectMessage | null>(null);
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
   const [isForwardPickerVisible, setIsForwardPickerVisible] = useState(false);
   const [isMediaGalleryVisible, setIsMediaGalleryVisible] = useState(false);
@@ -1221,8 +1229,10 @@ export default function ChatScreen() {
 
   const sendDirect = useSendDirectMessage(isGroup ? undefined : memberId);
   const uploadDirect = useUploadDirectMessage(isGroup ? undefined : memberId);
+  const editDirect = useEditDirectMessage(isGroup ? undefined : memberId);
   const sendGroup = useSendGroupMessage(isGroup ? conversationUuid : undefined);
   const uploadGroup = useUploadGroupMessage(isGroup ? conversationUuid : undefined);
+  const editGroup = useEditGroupMessage(isGroup ? conversationUuid : undefined);
   const markDirectRead = useMarkDirectChatRead();
 
   const messages = (isGroup ? groupMessagesQuery.data : directMessagesQuery.data)?.data ?? [];
@@ -1451,6 +1461,19 @@ export default function ChatScreen() {
     if (actionMessage) handleReply(actionMessage);
   }
 
+  function handleActionEdit() {
+    if (actionMessage) {
+      setEditingMessage(actionMessage);
+      setContent(actionMessage.content ?? '');
+      textInputRef.current?.focus();
+    }
+  }
+
+  function handleCancelEdit() {
+    setEditingMessage(null);
+    setContent('');
+  }
+
   function handleActionForward() {
     setIsForwardPickerVisible(true);
   }
@@ -1511,6 +1534,14 @@ export default function ChatScreen() {
     if (!trimmed && !pickedAttachment) return;
 
     stopTyping();
+
+    if (editingMessage) {
+      const editMutation = isGroup ? editGroup : editDirect;
+      editMutation.mutate({ messageUuid: editingMessage.uuid, content: trimmed });
+      setEditingMessage(null);
+      setContent('');
+      return;
+    }
 
     if (pickedAttachment) {
       const uploadMutation = isGroup ? uploadGroup : uploadDirect;
@@ -1700,9 +1731,9 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 52 : 0}
-        enabled={Platform.OS === 'ios'}
+        enabled
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
@@ -1899,6 +1930,27 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
+        {editingMessage ? (
+          <View className="flex-row items-center border-t border-white/12 bg-[#111111] px-4 py-2.5">
+            <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-[#38bdf8]/15">
+              <Ionicons name="pencil" size={14} color="#38bdf8" />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text className="text-[12px] font-semibold text-[#38bdf8]">Editing Message</Text>
+              <Text numberOfLines={1} className="mt-0.5 text-[12px] text-white/70">
+                {editingMessage.content}
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleCancelEdit}
+              hitSlop={8}
+              className="ml-2 h-7 w-7 items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+            >
+              <Ionicons name="close" size={16} color="#ffffff" />
+            </Pressable>
+          </View>
+        ) : null}
+
         <View
           className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 pt-3"
           style={{
@@ -1959,8 +2011,8 @@ export default function ChatScreen() {
                 <Loader size={18} color="#ffffff" />
               ) : (
                 <Ionicons
-                  name="send"
-                  size={17}
+                  name={editingMessage ? "checkmark" : "send"}
+                  size={editingMessage ? 20 : 17}
                   color={canSend ? COLORS.buttonPrimaryForeground : 'rgba(255,255,255,0.35)'}
                 />
               )}
@@ -2016,6 +2068,7 @@ export default function ChatScreen() {
           setActionMessage(null);
         }}
         onReply={handleActionReply}
+        onEdit={handleActionEdit}
         onForward={handleActionForward}
         onPin={handleActionPin}
         onUnpin={handleActionUnpin}

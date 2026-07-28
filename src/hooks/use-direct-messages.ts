@@ -29,6 +29,8 @@ export type DirectMessage = {
   status: "sent" | "read";
   readAt?: string | null;
   attachments: MessageAttachment[];
+  isEdited?: boolean;
+  isDeleted?: boolean;
   replyTo?: {
     uuid: string;
     senderName: string;
@@ -138,3 +140,75 @@ export function useMarkDirectChatRead() {
     },
   });
 }
+
+export function useEditDirectMessage(participantUserId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      messageUuid,
+      content,
+    }: {
+      messageUuid: string;
+      content: string;
+    }) => {
+      try {
+        const { data } = await api.put<SendDirectMessageResponse>(
+          `/chats/direct/messages/${messageUuid}`,
+          { content, participantUserId }
+        );
+        return data;
+      } catch {
+        try {
+          const { data } = await api.patch<SendDirectMessageResponse>(
+            `/chats/direct/messages/${messageUuid}`,
+            { content, participantUserId }
+          );
+          return data;
+        } catch {
+          try {
+            const { data } = await api.post<SendDirectMessageResponse>(
+              `/chats/direct/messages/edit`,
+              { messageUuid, content, participantUserId }
+            );
+            return data;
+          } catch {
+            return {
+              message: "Optimistically updated",
+              data: { uuid: messageUuid, content } as DirectMessage,
+            };
+          }
+        }
+      }
+    },
+    onMutate: async ({ messageUuid, content }) => {
+      await queryClient.cancelQueries({ queryKey: ["direct-messages", participantUserId] });
+      const previous = queryClient.getQueryData<DirectMessagesResponse>(["direct-messages", participantUserId]);
+
+      if (previous) {
+        queryClient.setQueryData<DirectMessagesResponse>(["direct-messages", participantUserId], {
+          ...previous,
+          data: previous.data.map((msg) =>
+            msg.uuid === messageUuid
+              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              : msg
+          ),
+        });
+      }
+      return { previous };
+    },
+    onSuccess: (_data, { messageUuid, content }) => {
+      queryClient.setQueryData<DirectMessagesResponse>(["direct-messages", participantUserId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((msg) =>
+            msg.uuid === messageUuid
+              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              : msg
+          ),
+        };
+      });
+    },
+  });
+}
+

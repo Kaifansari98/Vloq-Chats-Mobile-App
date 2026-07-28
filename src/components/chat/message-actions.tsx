@@ -30,6 +30,7 @@ export function MessageActionsSheet({
   onForward,
   onPin,
   onUnpin,
+  onEdit,
 }: {
   visible: boolean;
   message: DirectMessage | null;
@@ -39,6 +40,7 @@ export function MessageActionsSheet({
   onForward: () => void;
   onPin: () => void;
   onUnpin: () => void;
+  onEdit?: () => void;
 }) {
   const slideAnim = useRef(new Animated.Value(300)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -90,6 +92,13 @@ export function MessageActionsSheet({
 
   const hasTextContent = Boolean(message.content?.trim());
 
+  const canEditMessage =
+    message.isOwnMessage &&
+    (message.type === 'TEXT' || message.type === 'DEFAULT' || !message.type) &&
+    hasTextContent &&
+    message.attachments.length === 0 &&
+    !message.isDeleted;
+
   const actions: ActionItem[] = [
     {
       key: 'reply',
@@ -98,6 +107,17 @@ export function MessageActionsSheet({
       iconColor: '#60a5fa',
       onPress: () => handleAction(onReply),
     },
+    ...(canEditMessage && onEdit
+      ? [
+          {
+            key: 'edit',
+            label: 'Edit Message',
+            icon: 'pencil' as const,
+            iconColor: '#38bdf8',
+            onPress: () => handleAction(onEdit),
+          },
+        ]
+      : []),
     {
       key: 'forward',
       label: 'Forward',
