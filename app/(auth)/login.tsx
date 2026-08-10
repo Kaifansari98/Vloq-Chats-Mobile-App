@@ -91,11 +91,12 @@ export default function LoginScreen() {
         >
           <View style={styles.inner}>
             <View style={styles.logoBadge}>
-              <Image
-                source={require('../../assets/butterflyai_logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>N</Text>
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0f172a' }}>Nexyn Chat</Text>
+              </View>
             </View>
 
             <View style={styles.headingContainer}>
