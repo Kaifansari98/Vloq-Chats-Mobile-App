@@ -9,6 +9,7 @@ type PinnedEntry = {
   content: string | null;
   senderName: string;
   attachmentType: string | null;
+  mimeType?: string | null;
   pinnedAt: string;
 };
 
@@ -50,14 +51,15 @@ export function usePinnedMessage(chatId: string) {
 
   const pinMessage = useCallback(
     async (message: DirectMessage) => {
+      const firstAttachment = message.attachments.length > 0
+        ? message.attachments[0]
+        : null;
       const entry: PinnedEntry = {
         messageUuid: message.uuid,
         content: message.content,
         senderName: message.senderName,
-        attachmentType:
-          message.attachments.length > 0
-            ? message.attachments[0].attachmentType
-            : null,
+        attachmentType: firstAttachment?.attachmentType ?? null,
+        mimeType: firstAttachment?.mimeType ?? null,
         pinnedAt: new Date().toISOString(),
       };
       setPinned(entry);

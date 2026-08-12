@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDirectChats } from '@/hooks/use-direct-chats';
 import type { Chat, DirectChat, GroupChat } from '@/hooks/use-direct-chats';
 import type { DirectMessage } from '@/hooks/use-direct-messages';
+import { getMessagePreview } from '@/lib/message-preview';
 import {
   useSendDirectMessage,
   useUploadDirectMessage,
@@ -173,13 +174,7 @@ export function ForwardPicker({
     ? message.content.length > 60
       ? `${message.content.slice(0, 60)}…`
       : message.content
-    : message?.attachments?.length
-      ? message.attachments[0].attachmentType === 'IMAGE'
-        ? '📷 Photo'
-        : message.attachments[0].mimeType?.startsWith('audio/')
-          ? '🎙️ Voice message'
-          : `📄 ${message.attachments[0].name}`
-      : 'Message';
+    : getMessagePreview(message);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={animateClose}>

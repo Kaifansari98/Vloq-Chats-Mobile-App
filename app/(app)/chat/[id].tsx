@@ -49,6 +49,7 @@ import {
   useUploadDirectMessage,
   useMarkDirectChatRead,
   useEditDirectMessage,
+  useRequestTranscription,
 } from '@/hooks/use-direct-messages';
 import {
   useGroupMessages,
@@ -63,6 +64,21 @@ import { PinnedBanner } from '@/components/chat/pinned-banner';
 import { MediaGallery } from '@/components/chat/media-gallery';
 import { MediaPreviewScreen } from '@/components/chat/media/media-preview-screen';
 import { usePinnedMessage } from '@/hooks/use-pinned-messages';
+import {
+  getMessagePreview as getMessagePreviewLabel,
+  getPreviewFromAttachmentType,
+  resolveAttachmentType,
+} from '@/lib/message-preview';
+import { AIReplySuggestionsRow } from '@/components/chat/ai-reply-suggestions';
+import { AISummaryModal } from '@/components/chat/ai-summary-modal';
+import { GroupInfoModal } from '@/components/chat/group-info-modal';
+import {
+  useAIChatSummary,
+  useAITranslation,
+  useAIGrammarFix,
+  useAIVoiceSummary,
+} from '@/hooks/use-ai-features';
+import type { ChatSummaryResult } from '@/lib/ai';
 
 const TYPING_STOP_DELAY = 2000;
 
@@ -231,6 +247,122 @@ function generateAudioBars(seed: number, count: number): number[] {
     const envelope = Math.sin((index / Math.max(1, count - 1)) * Math.PI);
     return 0.12 + envelope * 0.55 + rand() * 0.33;
   });
+}
+
+function TranscriptionSection({ attachment }: { attachment: MessageAttachment }) {
+  const [expanded, setExpanded] = useState(true);
+  const requestTranscription = useRequestTranscription();
+  const voiceSummaryMutation = useAIVoiceSummary();
+  const [voiceSummary, setVoiceSummary] = useState<string | null>(null);
+
+  const status = attachment.transcriptionStatus ?? (attachment.transcription ? 'COMPLETED' : 'NOT_REQUESTED');
+  const transcriptionText = attachment.transcription;
+
+  // Automatically request transcription for voice messages that haven't been transcribed yet
+  useEffect(() => {
+    if (
+      !transcriptionText &&
+      status === 'NOT_REQUESTED' &&
+      !requestTranscription.isPending &&
+      !requestTranscription.isSuccess &&
+      !requestTranscription.isError
+    ) {
+      requestTranscription.mutate(attachment.uuid);
+    }
+  }, [attachment.uuid, status, transcriptionText, requestTranscription]);
+
+  // Generate AI Voice Summary if transcript is long enough
+  useEffect(() => {
+    if (
+      transcriptionText &&
+      transcriptionText.length > 25 &&
+      !voiceSummary &&
+      !voiceSummaryMutation.isPending &&
+      !voiceSummaryMutation.isSuccess
+    ) {
+      voiceSummaryMutation.mutate(transcriptionText, {
+        onSuccess: (res) => setVoiceSummary(res),
+      });
+    }
+  }, [transcriptionText, voiceSummary, voiceSummaryMutation]);
+
+  if (status === 'PENDING' || status === 'PROCESSING' || requestTranscription.isPending) {
+    return (
+      <View className="mt-2 flex-row items-center gap-1.5 border-t border-white/10 pt-1.5">
+        <Loader size={12} color="rgba(255,255,255,0.7)" />
+        <Text className="text-[11px] italic text-white/70">Transcribing voice message...</Text>
+      </View>
+    );
+  }
+
+  if (status === 'COMPLETED' && transcriptionText) {
+    return (
+      <View className="mt-2 border-t border-white/10 pt-1.5">
+        <Pressable
+          onPress={() => setExpanded(!expanded)}
+          className="flex-row items-center justify-between py-0.5"
+          hitSlop={4}
+        >
+          <View className="flex-row items-center gap-1">
+            <Ionicons name="sparkles" size={12} color="#60a5fa" />
+            <Text className="text-[11px] font-semibold text-blue-400">
+              Transcript
+            </Text>
+            {attachment.transcriptionLanguage ? (
+              <View className="ml-1 rounded bg-white/15 px-1 py-0.2">
+                <Text className="text-[9px] uppercase font-bold text-white/80">
+                  {attachment.transcriptionLanguage}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color="rgba(255,255,255,0.6)"
+          />
+        </Pressable>
+        {expanded ? (
+          <View className="mt-1">
+            <Text className="text-[12px] leading-4 text-white/90">
+              {transcriptionText}
+            </Text>
+            {voiceSummary ? (
+              <View className="mt-2 rounded-lg bg-blue-500/10 border border-blue-500/20 p-2">
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="sparkles" size={11} color="#60a5fa" />
+                  <Text className="text-[10px] font-bold uppercase text-blue-400">
+                    AI Voice Summary
+                  </Text>
+                </View>
+                <Text className="mt-0.5 text-[11px] leading-4 text-white/85">
+                  {voiceSummary}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  if (status === 'FAILED' || requestTranscription.isError) {
+    return (
+      <View className="mt-2 flex-row items-center justify-between border-t border-white/10 pt-1.5">
+        <Text className="text-[11px] text-red-400">Transcription failed</Text>
+        <Pressable
+          onPress={() => requestTranscription.mutate(attachment.uuid)}
+          className="flex-row items-center gap-1 rounded bg-white/10 px-1.5 py-0.5"
+          hitSlop={4}
+        >
+          <Ionicons name="refresh" size={10} color="#ffffff" />
+          <Text className="text-[10px] font-medium text-white">Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return null;
 }
 
 function AudioMessageBubble({
@@ -418,6 +550,8 @@ function AudioMessageBubble({
             </Pressable>
           </View>
         </View>
+
+        <TranscriptionSection attachment={attachment} />
       </View>
 
       {!isOwn ? avatar : null}
@@ -750,6 +884,7 @@ function MessageBubble({
   onJumpToMessage,
   isHighlighted,
   isPeerOnline,
+  translatedText,
 }: {
   message: DirectMessage;
   isOwn: boolean;
@@ -763,6 +898,7 @@ function MessageBubble({
   onJumpToMessage: (messageUuid: string) => void;
   isHighlighted: boolean;
   isPeerOnline?: boolean;
+  translatedText?: string | null;
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const translateX = useRef(new Animated.Value(0)).current;
@@ -843,16 +979,18 @@ function MessageBubble({
     extrapolate: 'clamp',
   });
 
-  const imageAttachments = message.attachments.filter(
-    (attachment) => attachment.attachmentType === 'IMAGE'
-  );
-  const fileAttachment = message.attachments.find(
-    (attachment) =>
-      attachment.attachmentType !== 'IMAGE' && !attachment.mimeType?.startsWith('audio/')
-  );
-  const audioAttachment = message.attachments.find((attachment) =>
-    attachment.mimeType?.startsWith('audio/')
-  );
+  const imageAttachments = message.attachments.filter((attachment) => {
+    const t = resolveAttachmentType(attachment);
+    return t === 'image' || t === 'gif';
+  });
+  const audioAttachment = message.attachments.find((attachment) => {
+    const t = resolveAttachmentType(attachment);
+    return t === 'voice' || t === 'audio';
+  });
+  const fileAttachment = message.attachments.find((attachment) => {
+    const t = resolveAttachmentType(attachment);
+    return t !== 'image' && t !== 'gif' && t !== 'voice' && t !== 'audio';
+  });
   const isAudioOnlyMessage =
     Boolean(audioAttachment) &&
     imageAttachments.length === 0 &&
@@ -876,6 +1014,16 @@ function MessageBubble({
         isAudio: false,
       };
     }
+    if (message.replyTo.attachmentType === 'VIDEO') {
+      return {
+        icon: 'videocam' as const,
+        label: 'Video',
+        fileColor: null,
+        thumbnailUri: null,
+        thumbnailKind: null,
+        isAudio: false,
+      };
+    }
     if (message.replyTo.attachmentType === 'FILE') {
       const originalFile = messagesByUuid
         .get(message.replyTo.uuid)
@@ -883,6 +1031,30 @@ function MessageBubble({
           (attachment) =>
             attachment.attachmentType !== 'IMAGE' && !attachment.mimeType?.startsWith('audio/')
         );
+      // Backward-compat: a FILE might actually be an image/audio based on MIME
+      if (originalFile) {
+        const resolvedType = resolveAttachmentType(originalFile);
+        if (resolvedType === 'image') {
+          return {
+            icon: 'camera' as const,
+            label: 'Photo',
+            fileColor: null,
+            thumbnailUri: originalFile.url ?? null,
+            thumbnailKind: 'image' as const,
+            isAudio: false,
+          };
+        }
+        if (resolvedType === 'voice' || resolvedType === 'audio') {
+          return {
+            icon: 'mic' as const,
+            label: resolvedType === 'voice' ? 'Voice' : 'Audio',
+            fileColor: null,
+            thumbnailUri: null,
+            thumbnailKind: null,
+            isAudio: true,
+          };
+        }
+      }
       return {
         icon: 'document-text' as const,
         label: originalFile?.name ?? 'Document',
@@ -896,7 +1068,7 @@ function MessageBubble({
     if (message.replyTo.attachmentType === 'AUDIO') {
       return {
         icon: 'mic' as const,
-        label: 'Voice message',
+        label: 'Voice',
         fileColor: null,
         thumbnailUri: null,
         thumbnailKind: null,
@@ -1117,6 +1289,16 @@ function MessageBubble({
                 </Text>
               ) : null}
 
+              {translatedText ? (
+                <View className="mt-2 border-t border-white/10 pt-1.5">
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons name="language" size={12} color="#60a5fa" />
+                    <Text className="text-[11px] font-semibold text-blue-400">AI Translation</Text>
+                  </View>
+                  <Text className="mt-0.5 text-[13px] leading-4 text-white/90">{translatedText}</Text>
+                </View>
+              ) : null}
+
               {!isAudioOnlyMessage ? (
                 <View className="mt-1 flex-row items-center justify-end gap-1">
                   {message.isEdited ? (
@@ -1192,6 +1374,48 @@ export default function ChatScreen() {
   const [isMediaGalleryVisible, setIsMediaGalleryVisible] = useState(false);
   const { pinned, pinMessage, unpinMessage } = usePinnedMessage(conversationUuid);
 
+  // ── AI Features state & handlers ──
+  const [isSummaryModalVisible, setIsSummaryModalVisible] = useState(false);
+  const [isGroupInfoVisible, setIsGroupInfoVisible] = useState(false);
+  const [summaryData, setSummaryData] = useState<ChatSummaryResult | null>(null);
+  const [translationsMap, setTranslationsMap] = useState<Record<string, string>>({});
+
+  const summaryMutation = useAIChatSummary();
+  const translateMutation = useAITranslation();
+  const grammarFixMutation = useAIGrammarFix();
+
+  function handleGenerateSummary() {
+    setIsSummaryModalVisible(true);
+    summaryMutation.mutate(messages, {
+      onSuccess: (result) => setSummaryData(result),
+    });
+  }
+
+  function handleTranslateAction() {
+    if (!actionMessage?.content?.trim()) return;
+    const msgUuid = actionMessage.uuid;
+    translateMutation.mutate(
+      { text: actionMessage.content },
+      {
+        onSuccess: (res) => {
+          setTranslationsMap((prev) => ({
+            ...prev,
+            [msgUuid]: res.translatedText,
+          }));
+        },
+      }
+    );
+  }
+
+  function handleGrammarFix() {
+    if (!content.trim() || grammarFixMutation.isPending) return;
+    grammarFixMutation.mutate(content, {
+      onSuccess: (res) => {
+        setContent(res.correctedText);
+      },
+    });
+  }
+
   const isInitialLoadRef = useRef(true);
   const showScrollToBottomRef = useRef(false);
 
@@ -1234,11 +1458,18 @@ export default function ChatScreen() {
   const uploadGroup = useUploadGroupMessage(isGroup ? conversationUuid : undefined);
   const editGroup = useEditGroupMessage(isGroup ? conversationUuid : undefined);
   const markDirectRead = useMarkDirectChatRead();
+  const requestTranscription = useRequestTranscription();
 
   const messages = (isGroup ? groupMessagesQuery.data : directMessagesQuery.data)?.data ?? [];
   const isLoading = isGroup ? groupMessagesQuery.isLoading : directMessagesQuery.isLoading;
   const isSending = isGroup ? sendGroup.isPending : sendDirect.isPending;
   const isUploading = isGroup ? uploadGroup.isPending : uploadDirect.isPending;
+
+  useEffect(() => {
+    if (!isGroup && memberId > 0 && messages.length > 0) {
+      markDirectRead.mutate(memberId);
+    }
+  }, [isGroup, memberId, messages.length]);
 
   const messagesByUuid = useMemo(
     () => new Map(messages.map((message) => [message.uuid, message])),
@@ -1586,9 +1817,18 @@ export default function ChatScreen() {
         replyToMessageUuid: replyTo?.uuid,
       },
       {
-        onSuccess: () => {
+        onSuccess: (responseData) => {
           setReplyTo(null);
           scrollToBottom(true);
+
+          // Auto-trigger transcription for the uploaded audio attachment if present
+          const audioAttachment = responseData?.data?.attachments?.find((a) => {
+            const t = resolveAttachmentType(a);
+            return t === 'voice' || t === 'audio';
+          });
+          if (audioAttachment?.uuid) {
+            requestTranscription.mutate(audioAttachment.uuid);
+          }
         },
         onError: (error) => {
           const responseData = (error as { response?: { data?: unknown } })?.response?.data;
@@ -1607,17 +1847,7 @@ export default function ChatScreen() {
   const replyToIsOwn = replyTo?.isOwnMessage ?? false;
   const replyPreviewText = (() => {
     if (!replyTo) return '';
-    if (replyTo.attachments.some((attachment) => attachment.mimeType?.startsWith('audio/'))) {
-      return 'Voice message';
-    }
-    if (replyTo.attachments.some((attachment) => attachment.attachmentType === 'IMAGE')) {
-      return 'Photo';
-    }
-    if (replyTo.attachments.length > 0) {
-      const file = replyTo.attachments[0];
-      return file.name || 'Document';
-    }
-    return replyTo.content ?? 'Message';
+    return getMessagePreviewLabel(replyTo);
   })();
 
   return (
@@ -1632,29 +1862,34 @@ export default function ChatScreen() {
           <Ionicons name="chevron-back" size={24} color="#ffffff" />
         </Pressable>
 
-        <View>
-          <Avatar name={name} url={profilePicUrl} size={38} />
-          {isOnline ? (
-            <View className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-400" />
-          ) : null}
-        </View>
+        <Pressable
+          onPress={() => isGroup && setIsGroupInfoVisible(true)}
+          className="flex-row items-center flex-1 gap-3 min-w-0"
+        >
+          <View>
+            <Avatar name={name} url={profilePicUrl} size={38} isGroup={isGroup} />
+            {isOnline ? (
+              <View className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-400" />
+            ) : null}
+          </View>
 
-        <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className="text-[16px] font-semibold text-white">
-            {name}
-          </Text>
-          {isPeerTyping ? (
-            <Text className="text-[12px] text-button-primary">typing...</Text>
-          ) : isGroup ? (
-            <Text numberOfLines={1} className="text-[12px] text-white/40">
-              tap for contact info
+          <View className="min-w-0 flex-1">
+            <Text numberOfLines={1} className="text-[16px] font-semibold text-white">
+              {name}
             </Text>
-          ) : (
-            <Text numberOfLines={1} className="text-[12px] text-white/40">
-              {isOnline ? 'Active now' : 'Offline'}
-            </Text>
-          )}
-        </View>
+            {isPeerTyping ? (
+              <Text className="text-[12px] text-button-primary">typing...</Text>
+            ) : isGroup ? (
+              <Text numberOfLines={1} className="text-[12px] text-white/40">
+                tap for group info
+              </Text>
+            ) : (
+              <Text numberOfLines={1} className="text-[12px] text-white/40">
+                {isOnline ? 'Active now' : 'Offline'}
+              </Text>
+            )}
+          </View>
+        </Pressable>
 
         <View className="flex-row items-center gap-1">
           <Pressable
@@ -1685,6 +1920,28 @@ export default function ChatScreen() {
                   className="absolute right-3 rounded-xl bg-[#2a2a2a] py-2 w-48 border border-white/10"
                   style={{ top: insets.top + 45, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10 }}
                 >
+                  {isGroup && (
+                    <Pressable
+                      className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
+                      onPress={() => {
+                        setIsMenuOpen(false);
+                        setIsGroupInfoVisible(true);
+                      }}
+                    >
+                      <Ionicons name="information-circle-outline" size={18} color="#60a5fa" />
+                      <Text className="text-blue-400 font-semibold text-[15px]">Group Info</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
+                    onPress={() => {
+                      setIsMenuOpen(false);
+                      handleGenerateSummary();
+                    }}
+                  >
+                    <Ionicons name="sparkles" size={18} color="#60a5fa" />
+                    <Text className="text-blue-400 font-semibold text-[15px]">AI Chat Summary</Text>
+                  </Pressable>
                   <Pressable
                     className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
                     onPress={() => {
@@ -1741,132 +1998,133 @@ export default function ChatScreen() {
           </View>
         ) : (
           <>
-          <PinnedBanner
-            pinned={pinned}
-            onPress={handlePinnedBannerPress}
-            onUnpin={handleActionUnpin}
-          />
-          <View className="relative flex-1 overflow-hidden">
-            <Image
-              source={require('../../../assets/chat-doodle-pattern.png')}
-              style={{ position: 'absolute', top: 0, left: 0, width: 400, height: 700 }}
-              resizeMode="cover"
+            <PinnedBanner
+              pinned={pinned}
+              onPress={handlePinnedBannerPress}
+              onUnpin={handleActionUnpin}
             />
-            <View
-              pointerEvents="none"
-              className="absolute inset-0 bg-black/35"
-            />
-            <FlatList
-              ref={listRef}
-              data={rows}
-              keyExtractor={(row) => row.key}
-              style={{ flex: 1 }}
-              contentContainerStyle={{
-                paddingTop: 12,
-                paddingHorizontal: 8,
-                paddingBottom: 12,
-                flexGrow: 1,
-              }}
-              keyboardShouldPersistTaps="always"
-              keyboardDismissMode="none"
-              onContentSizeChange={() => {
-                if (isInitialLoadRef.current || !showScrollToBottomRef.current) {
-                  listRef.current?.scrollToEnd({ animated: false });
-                }
-              }}
-              onScroll={(event) => {
-                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-                const distanceFromBottom =
-                  contentSize.height - contentOffset.y - layoutMeasurement.height;
-                const isFarFromBottom = distanceFromBottom > 150;
-                setShowScrollToBottom(isFarFromBottom);
-                showScrollToBottomRef.current = isFarFromBottom;
-              }}
-              scrollEventThrottle={100}
-              onScrollToIndexFailed={(info) => {
-                setTimeout(() => {
-                  listRef.current?.scrollToIndex({
-                    index: info.index,
-                    animated: true,
-                    viewPosition: 0.3,
-                  });
-                }, 100);
-              }}
-              renderItem={({ item, index }) => {
-                if (item.kind === 'divider') {
-                  return (
-                    <View className="my-3 items-center">
-                      <View className="rounded-full bg-white/8 px-3 py-1">
-                        <Text className="text-[11px] font-semibold text-white/60">
-                          {item.label}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                }
-
-                if (item.kind === 'typing') {
-                  return (
-                    <View className="mb-1.5 mt-2 items-start">
-                      <Text className="mb-1 px-1 text-[11px] font-medium text-white/50">
-                        {typingActorLabel}
-                      </Text>
-                      <View className="rounded-2xl rounded-bl-sm bg-bubbleReceived px-4 py-3">
-                        <TypingDots color={COLORS.buttonPrimary} />
-                      </View>
-                    </View>
-                  );
-                }
-
-                const message = item.message;
-                const isOwn = message.isOwnMessage;
-
-                const prevRow = rows[index - 1];
-                const isSameSenderAsPrev =
-                  prevRow?.kind === 'message' && prevRow.message.isOwnMessage === isOwn;
-                const topGap = isSameSenderAsPrev ? 'mt-1' : 'mt-4';
-
-                return (
-                  <MessageBubble
-                    message={message}
-                    isOwn={isOwn}
-                    senderProfilePicUrl={!isOwn && !isGroup ? profilePicUrl : null}
-                    showSenderName={isGroup && !isOwn}
-                    topGapClassName={topGap}
-                    onReply={handleReply}
-                    onMessageAction={handleMessageAction}
-                    messagesByUuid={messagesByUuid}
-                    onOpenImageViewer={handleOpenImageViewer}
-                    onJumpToMessage={handleJumpToMessage}
-                    isHighlighted={highlightedMessageUuid === message.uuid}
-                    isPeerOnline={isOnline}
-                  />
-                );
-              }}
-            />
-
-            {showScrollToBottom ? (
-              <Pressable
-                onPress={() => listRef.current?.scrollToEnd({ animated: true })}
-                hitSlop={8}
-                className="absolute bottom-3 right-4 h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1c1c1c]"
-                style={{
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.35,
-                  shadowRadius: 8,
-                  elevation: 6,
+            <View className="relative flex-1 overflow-hidden">
+              <Image
+                source={require('../../../assets/chat-doodle-pattern.png')}
+                style={{ position: 'absolute', top: 0, left: 0, width: 400, height: 700 }}
+                resizeMode="cover"
+              />
+              <View
+                pointerEvents="none"
+                className="absolute inset-0 bg-black/35"
+              />
+              <FlatList
+                ref={listRef}
+                data={rows}
+                keyExtractor={(row) => row.key}
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  paddingTop: 12,
+                  paddingHorizontal: 8,
+                  paddingBottom: 12,
+                  flexGrow: 1,
                 }}
-              >
-                <Ionicons
-                  name="chevron-down"
-                  size={22}
-                  color="#ffffff"
-                  style={{ marginTop: 1 }}
-                />
-              </Pressable>
-            ) : null}
-          </View>
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode="none"
+                onContentSizeChange={() => {
+                  if (isInitialLoadRef.current || !showScrollToBottomRef.current) {
+                    listRef.current?.scrollToEnd({ animated: false });
+                  }
+                }}
+                onScroll={(event) => {
+                  const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                  const distanceFromBottom =
+                    contentSize.height - contentOffset.y - layoutMeasurement.height;
+                  const isFarFromBottom = distanceFromBottom > 150;
+                  setShowScrollToBottom(isFarFromBottom);
+                  showScrollToBottomRef.current = isFarFromBottom;
+                }}
+                scrollEventThrottle={100}
+                onScrollToIndexFailed={(info) => {
+                  setTimeout(() => {
+                    listRef.current?.scrollToIndex({
+                      index: info.index,
+                      animated: true,
+                      viewPosition: 0.3,
+                    });
+                  }, 100);
+                }}
+                renderItem={({ item, index }) => {
+                  if (item.kind === 'divider') {
+                    return (
+                      <View className="my-3 items-center">
+                        <View className="rounded-full bg-white/8 px-3 py-1">
+                          <Text className="text-[11px] font-semibold text-white/60">
+                            {item.label}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  if (item.kind === 'typing') {
+                    return (
+                      <View className="mb-1.5 mt-2 items-start">
+                        <Text className="mb-1 px-1 text-[11px] font-medium text-white/50">
+                          {typingActorLabel}
+                        </Text>
+                        <View className="rounded-2xl rounded-bl-sm bg-bubbleReceived px-4 py-3">
+                          <TypingDots color={COLORS.buttonPrimary} />
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  const message = item.message;
+                  const isOwn = message.isOwnMessage;
+
+                  const prevRow = rows[index - 1];
+                  const isSameSenderAsPrev =
+                    prevRow?.kind === 'message' && prevRow.message.isOwnMessage === isOwn;
+                  const topGap = isSameSenderAsPrev ? 'mt-1' : 'mt-4';
+
+                  return (
+                    <MessageBubble
+                      message={message}
+                      isOwn={isOwn}
+                      senderProfilePicUrl={!isOwn && !isGroup ? profilePicUrl : null}
+                      showSenderName={isGroup && !isOwn}
+                      topGapClassName={topGap}
+                      onReply={handleReply}
+                      onMessageAction={handleMessageAction}
+                      messagesByUuid={messagesByUuid}
+                      onOpenImageViewer={handleOpenImageViewer}
+                      onJumpToMessage={handleJumpToMessage}
+                      isHighlighted={highlightedMessageUuid === message.uuid}
+                      isPeerOnline={isOnline}
+                      translatedText={translationsMap[message.uuid]}
+                    />
+                  );
+                }}
+              />
+
+              {showScrollToBottom ? (
+                <Pressable
+                  onPress={() => listRef.current?.scrollToEnd({ animated: true })}
+                  hitSlop={8}
+                  className="absolute bottom-3 right-4 h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1c1c1c]"
+                  style={{
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 6,
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-down"
+                    size={22}
+                    color="#ffffff"
+                    style={{ marginTop: 1 }}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
           </>
         )}
 
@@ -1951,6 +2209,13 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
+        <AIReplySuggestionsRow
+          lastMessageContent={lastMessage?.content ?? null}
+          senderName={name}
+          onSelectSuggestion={(text) => setContent(text)}
+          visible={!content.trim() && voiceRecorderPhase === 'idle'}
+        />
+
         <View
           className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 pt-3"
           style={{
@@ -1979,13 +2244,27 @@ export default function ChatScreen() {
                     }}
                   />
                 ) : null}
+                {content.trim().length > 0 ? (
+                  <Pressable
+                    onPress={handleGrammarFix}
+                    hitSlop={6}
+                    className="mr-2 h-7 w-7 items-center justify-center rounded-full bg-blue-500/20 active:bg-blue-500/30"
+                  >
+                    {grammarFixMutation.isPending ? (
+                      <Loader size={13} color="#60a5fa" />
+                    ) : (
+                      <Ionicons name="sparkles" size={14} color="#60a5fa" />
+                    )}
+                  </Pressable>
+                ) : null}
                 <TextInput
                   ref={textInputRef}
                   value={content}
                   onChangeText={handleContentChange}
                   onFocus={() => {
-                    scrollToBottom(true);
-                    setTimeout(() => scrollToBottom(true), 150);
+                    if (isInitialLoadRef.current || !showScrollToBottomRef.current) {
+                      scrollToBottom(true);
+                    }
                   }}
                   placeholder="Type a message..."
                   placeholderTextColor="rgba(255,255,255,0.4)"
@@ -2072,6 +2351,7 @@ export default function ChatScreen() {
         onForward={handleActionForward}
         onPin={handleActionPin}
         onUnpin={handleActionUnpin}
+        onTranslate={handleTranslateAction}
       />
 
       <ForwardPicker
@@ -2117,6 +2397,21 @@ export default function ChatScreen() {
         attachment={previewAttachment}
         onClose={() => setPreviewAttachment(null)}
         onSend={handlePreviewSend}
+      />
+
+      <AISummaryModal
+        visible={isSummaryModalVisible}
+        onClose={() => setIsSummaryModalVisible(false)}
+        summary={summaryData}
+        isLoading={summaryMutation.isPending}
+        chatName={name}
+      />
+
+      <GroupInfoModal
+        visible={isGroupInfoVisible}
+        groupUuid={conversationUuid}
+        groupName={name}
+        onClose={() => setIsGroupInfoVisible(false)}
       />
     </View>
   );

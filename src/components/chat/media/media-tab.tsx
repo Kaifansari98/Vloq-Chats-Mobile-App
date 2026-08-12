@@ -3,6 +3,7 @@ import { View, Text, FlatList, useWindowDimensions, Pressable } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { MediaGridItem } from './media-grid-item';
+import { resolveAttachmentType } from '@/lib/message-preview';
 import type { DirectMessage, MessageAttachment } from '@/hooks/use-direct-messages';
 
 type GroupedMediaSection = {
@@ -42,7 +43,8 @@ export function MediaTab({
 
     for (const msg of sorted) {
       for (const att of msg.attachments) {
-        if (att.attachmentType === 'IMAGE' || att.attachmentType === 'VIDEO' || att.mimeType?.startsWith('image/') || att.mimeType?.startsWith('video/')) {
+        const type = resolveAttachmentType(att);
+        if (type === 'image' || type === 'gif' || type === 'video') {
           items.push({ attachment: att, message: msg });
         }
       }

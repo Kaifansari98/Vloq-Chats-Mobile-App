@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { View, Text, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DocumentRow, type DocumentItem } from './document-row';
+import { resolveAttachmentType } from '@/lib/message-preview';
 import type { DirectMessage } from '@/hooks/use-direct-messages';
 
 export function DocsTab({ messages }: { messages: DirectMessage[] }) {
@@ -15,10 +16,8 @@ export function DocsTab({ messages }: { messages: DirectMessage[] }) {
 
     for (const msg of sorted) {
       for (const att of msg.attachments) {
-        const isAudio = att.mimeType?.startsWith('audio/') || att.attachmentType === 'AUDIO';
-        const isMedia = att.attachmentType === 'IMAGE' || att.attachmentType === 'VIDEO' || att.mimeType?.startsWith('image/') || att.mimeType?.startsWith('video/');
-
-        if (!isAudio && !isMedia) {
+        const type = resolveAttachmentType(att);
+        if (type === 'document') {
           docs.push({
             attachment: att,
             messageUuid: msg.uuid,

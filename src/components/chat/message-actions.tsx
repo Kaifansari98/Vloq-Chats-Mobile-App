@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { DirectMessage } from '@/hooks/use-direct-messages';
+import { getMessagePreview } from '@/lib/message-preview';
 
 type ActionItem = {
   key: string;
@@ -31,6 +32,8 @@ export function MessageActionsSheet({
   onPin,
   onUnpin,
   onEdit,
+  onDelete,
+  onTranslate,
 }: {
   visible: boolean;
   message: DirectMessage | null;
@@ -41,6 +44,8 @@ export function MessageActionsSheet({
   onPin: () => void;
   onUnpin: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
+  onTranslate?: () => void;
 }) {
   const slideAnim = useRef(new Animated.Value(300)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -103,8 +108,8 @@ export function MessageActionsSheet({
     {
       key: 'reply',
       label: 'Reply',
-      icon: 'arrow-undo',
-      iconColor: '#60a5fa',
+      icon: 'arrow-undo-outline' as const,
+      iconColor: 'rgba(255,255,255,0.85)',
       onPress: () => handleAction(onReply),
     },
     ...(canEditMessage && onEdit
@@ -112,8 +117,8 @@ export function MessageActionsSheet({
           {
             key: 'edit',
             label: 'Edit Message',
-            icon: 'pencil' as const,
-            iconColor: '#38bdf8',
+            icon: 'pencil-outline' as const,
+            iconColor: 'rgba(255,255,255,0.85)',
             onPress: () => handleAction(onEdit),
           },
         ]
@@ -121,8 +126,8 @@ export function MessageActionsSheet({
     {
       key: 'forward',
       label: 'Forward',
-      icon: 'arrow-redo',
-      iconColor: '#34d399',
+      icon: 'arrow-redo-outline' as const,
+      iconColor: 'rgba(255,255,255,0.85)',
       onPress: () => handleAction(onForward),
     },
     ...(hasTextContent
@@ -130,31 +135,54 @@ export function MessageActionsSheet({
           {
             key: 'copy',
             label: 'Copy Text',
-            icon: 'copy' as const,
-            iconColor: '#a78bfa',
+            icon: 'copy-outline' as const,
+            iconColor: 'rgba(255,255,255,0.85)',
             onPress: () => {
               // eslint-disable-next-line @typescript-eslint/no-deprecated
               Clipboard.setString(message.content ?? '');
               animateClose();
             },
           },
+          ...(onTranslate
+            ? [
+                {
+                  key: 'translate',
+                  label: 'Translate Message (AI)',
+                  icon: 'language-outline' as const,
+                  iconColor: 'rgba(255,255,255,0.85)',
+                  onPress: () => handleAction(onTranslate),
+                },
+              ]
+            : []),
         ]
       : []),
     isPinned
       ? {
           key: 'unpin',
           label: 'Unpin Message',
-          icon: 'pin' as const,
-          iconColor: '#f97316',
+          icon: 'pin-outline' as const,
+          iconColor: 'rgba(255,255,255,0.85)',
           onPress: () => handleAction(onUnpin),
         }
       : {
           key: 'pin',
           label: 'Pin Message',
-          icon: 'pin' as const,
-          iconColor: '#f97316',
+          icon: 'pin-outline' as const,
+          iconColor: 'rgba(255,255,255,0.85)',
           onPress: () => handleAction(onPin),
         },
+    ...(onDelete
+      ? [
+          {
+            key: 'delete',
+            label: 'Delete Message',
+            icon: 'trash-outline' as const,
+            iconColor: '#f87171',
+            destructive: true,
+            onPress: () => handleAction(onDelete),
+          },
+        ]
+      : []),
   ];
 
   // Short preview of the message for context
@@ -162,13 +190,7 @@ export function MessageActionsSheet({
     ? message.content.length > 80
       ? `${message.content.slice(0, 80)}…`
       : message.content
-    : message.attachments.length > 0
-      ? message.attachments[0].attachmentType === 'IMAGE'
-        ? '📷 Photo'
-        : message.attachments[0].mimeType?.startsWith('audio/')
-          ? '🎙️ Voice message'
-          : `📄 ${message.attachments[0].name}`
-      : 'Message';
+    : getMessagePreview(message);
 
   return (
     <Modal
@@ -217,10 +239,7 @@ export function MessageActionsSheet({
                     : undefined
                 }
               >
-                <View
-                  className="h-9 w-9 items-center justify-center rounded-full"
-                  style={{ backgroundColor: `${action.iconColor}18` }}
-                >
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
                   <Ionicons name={action.icon} size={18} color={action.iconColor} />
                 </View>
                 <Text

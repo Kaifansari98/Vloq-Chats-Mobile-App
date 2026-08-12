@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MediaTab } from './media-tab';
 import { LinksTab } from './links-tab';
 import { DocsTab } from './docs-tab';
+import { resolveAttachmentType } from '@/lib/message-preview';
 import type { DirectMessage, MessageAttachment } from '@/hooks/use-direct-messages';
 
 export type TabKey = 'media' | 'links' | 'docs';
@@ -97,7 +98,8 @@ export function MediaLinksDocsScreen({
     let count = 0;
     for (const msg of messages) {
       for (const att of msg.attachments) {
-        if (att.attachmentType === 'IMAGE' || att.attachmentType === 'VIDEO' || att.mimeType?.startsWith('image/') || att.mimeType?.startsWith('video/')) {
+        const type = resolveAttachmentType(att);
+        if (type === 'image' || type === 'gif' || type === 'video') {
           count++;
         }
       }
@@ -109,9 +111,7 @@ export function MediaLinksDocsScreen({
     let count = 0;
     for (const msg of messages) {
       for (const att of msg.attachments) {
-        const isAudio = att.mimeType?.startsWith('audio/') || att.attachmentType === 'AUDIO';
-        const isMedia = att.attachmentType === 'IMAGE' || att.attachmentType === 'VIDEO' || att.mimeType?.startsWith('image/') || att.mimeType?.startsWith('video/');
-        if (!isAudio && !isMedia) count++;
+        if (resolveAttachmentType(att) === 'document') count++;
       }
     }
     return count;

@@ -135,6 +135,7 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
     socket.on("group_chat:created", invalidateChats);
     socket.on("group_message:new", invalidateChats);
     socket.on("group_message:updated", invalidateChats);
+    socket.on("attachment:transcription_updated", invalidateChats);
     socket.on("direct_message:typing", handleDirectTyping);
     socket.on("group_message:typing", handleGroupTyping);
     socket.on("presence:snapshot", handlePresenceSnapshot);
@@ -147,6 +148,7 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
       socket.off("group_chat:created", invalidateChats);
       socket.off("group_message:new", invalidateChats);
       socket.off("group_message:updated", invalidateChats);
+      socket.off("attachment:transcription_updated", invalidateChats);
       socket.off("direct_message:typing", handleDirectTyping);
       socket.off("group_message:typing", handleGroupTyping);
       socket.off("presence:snapshot", handlePresenceSnapshot);

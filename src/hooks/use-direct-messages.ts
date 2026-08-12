@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+export type TranscriptionStatus =
+  | 'NOT_REQUESTED'
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED';
+
 export type MessageAttachment = {
   uuid: string;
   attachmentType: string;
@@ -13,6 +20,12 @@ export type MessageAttachment = {
   height?: number | null;
   durationSeconds?: number | null;
   quality?: 'STANDARD' | 'HD';
+
+  // Voice transcription fields
+  transcription?: string | null;
+  transcriptionStatus?: TranscriptionStatus;
+  transcriptionLanguage?: string | null;
+  transcriptionError?: string | null;
 };
 
 export type DirectMessage = {
@@ -135,8 +148,11 @@ export function useMarkDirectChatRead() {
       );
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, participantUserId) => {
       void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["direct-messages", participantUserId],
+      });
     },
   });
 }
@@ -212,3 +228,18 @@ export function useEditDirectMessage(participantUserId?: number) {
   });
 }
 
+export function useRequestTranscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (attachmentUuid: string) => {
+      const { data } = await api.post<{ message: string }>(
+        `/chats/transcribe/${attachmentUuid}`
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["group-messages"] });
+    },
+  });
+}

@@ -1,12 +1,14 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getPreviewFromAttachmentType } from '@/lib/message-preview';
 
 type PinnedInfo = {
   messageUuid: string;
   content: string | null;
   senderName: string;
   attachmentType: string | null;
+  mimeType?: string | null;
   pinnedAt: string;
 };
 
@@ -64,13 +66,7 @@ export function PinnedBanner({
 
   const previewText = pinned.content?.trim()
     ? pinned.content
-    : pinned.attachmentType === 'IMAGE'
-      ? '📷 Photo'
-      : pinned.attachmentType === 'AUDIO'
-        ? '🎙️ Voice message'
-        : pinned.attachmentType === 'FILE'
-          ? '📄 Document'
-          : 'Message';
+    : getPreviewFromAttachmentType(pinned.attachmentType, pinned.mimeType).label;
 
   return (
     <Animated.View
@@ -88,7 +84,7 @@ export function PinnedBanner({
         {/* Pin icon + colored bar */}
         <View className="mr-3 flex-row items-center gap-2">
           <View className="h-8 w-1 rounded-full bg-[#f97316]" />
-          <Ionicons name="pin" size={16} color="#f97316" />
+          <Ionicons name="pin-outline" size={16} color="#f97316" />
         </View>
 
         {/* Content preview */}

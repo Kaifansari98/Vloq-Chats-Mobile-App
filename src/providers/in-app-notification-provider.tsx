@@ -14,6 +14,7 @@ import {
   InAppNotificationBanner,
   type InAppNotificationData,
 } from '@/components/in-app-notification';
+import { getNotificationPreview } from '@/lib/message-preview';
 
 type InAppNotificationContextType = {
   /** Manually show a notification (used for testing or custom triggers) */
@@ -67,18 +68,10 @@ type GroupMessagePayload = {
 
 function getMessagePreview(payload: DirectMessagePayload | GroupMessagePayload): string {
   const msg = payload.message;
-  if (msg?.content) return msg.content;
-
-  // Check for attachments
-  const attachments = msg?.attachments ?? [];
-  if (attachments.length > 0) {
-    const first = attachments[0];
-    if (first?.mimeType?.startsWith('audio/')) return '🎙️ Voice message';
-    if (first?.attachmentType === 'IMAGE') return '📷 Photo';
-    return '📎 File';
-  }
-
-  return 'Sent a message';
+  return getNotificationPreview({
+    content: msg?.content ?? (payload as DirectMessagePayload).content ?? null,
+    attachments: msg?.attachments,
+  });
 }
 
 export function InAppNotificationProvider({ children }: { children: ReactNode }) {
