@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLogout } from '@/hooks/use-logout';
 import { Loader } from '@/components/ui/Loader';
 import { useUploadProfilePic, useUpdateProfile, useFetchUserProfile } from '@/hooks/use-profile';
+import { CreateUserModal } from '@/components/admin/create-user-modal';
 
 const AVATAR_SIZE = 110;
 
@@ -127,6 +128,13 @@ export default function ProfileScreen() {
   const profilePic = user?.profile_pic_url ?? null;
   const orgName = user?.organizationName ?? 'Vloq Workspace';
   const roleCode = user?.userTypeCode ?? 'MEMBER';
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+
+  const isAdmin =
+    user?.userTypeCode === 'ADMIN' ||
+    user?.userTypeCode === 'ORG_ADMIN' ||
+    user?.userTypeCode?.toUpperCase().includes('ADMIN') ||
+    (user as any)?.role === 'ADMIN';
 
   function handleLogout() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -304,6 +312,25 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Admin Section */}
+        {isAdmin ? (
+          <Pressable
+            onPress={() => setIsCreateUserOpen(true)}
+            className="mx-4 mt-3 bg-blue-600/15 border border-blue-500/30 rounded-[22px] p-4 flex-row items-center justify-between active:bg-blue-600/25"
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="h-10 w-10 rounded-full bg-blue-500/20 items-center justify-center">
+                <Ionicons name="person-add" size={20} color="#60a5fa" />
+              </View>
+              <View>
+                <Text className="text-[15px] font-semibold text-white">Create New User</Text>
+                <Text className="text-[12px] text-blue-400 font-medium">Admin Only · Register team member</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+        ) : null}
+
         {/* Settings Options Card */}
         <View className="mx-4 mt-1 bg-white/5 rounded-[24px] border border-white/10 overflow-hidden">
           {SETTINGS_ITEMS.map((item, i) => (
@@ -386,6 +413,11 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      {/* Create User Modal for Admin */}
+      <CreateUserModal
+        visible={isCreateUserOpen}
+        onClose={() => setIsCreateUserOpen(false)}
+      />
     </View>
   );
 }
