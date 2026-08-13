@@ -69,16 +69,8 @@ import {
   getPreviewFromAttachmentType,
   resolveAttachmentType,
 } from '@/lib/message-preview';
-import { AIReplySuggestionsRow } from '@/components/chat/ai-reply-suggestions';
-import { AISummaryModal } from '@/components/chat/ai-summary-modal';
 import { GroupInfoModal } from '@/components/chat/group-info-modal';
-import {
-  useAIChatSummary,
-  useAITranslation,
-  useAIGrammarFix,
-  useAIVoiceSummary,
-} from '@/hooks/use-ai-features';
-import type { ChatSummaryResult } from '@/lib/ai';
+import { UserInfoModal } from '@/components/chat/user-info-modal';
 
 const TYPING_STOP_DELAY = 2000;
 
@@ -252,8 +244,6 @@ function generateAudioBars(seed: number, count: number): number[] {
 function TranscriptionSection({ attachment }: { attachment: MessageAttachment }) {
   const [expanded, setExpanded] = useState(true);
   const requestTranscription = useRequestTranscription();
-  const voiceSummaryMutation = useAIVoiceSummary();
-  const [voiceSummary, setVoiceSummary] = useState<string | null>(null);
 
   const status = attachment.transcriptionStatus ?? (attachment.transcription ? 'COMPLETED' : 'NOT_REQUESTED');
   const transcriptionText = attachment.transcription;
@@ -270,21 +260,6 @@ function TranscriptionSection({ attachment }: { attachment: MessageAttachment })
       requestTranscription.mutate(attachment.uuid);
     }
   }, [attachment.uuid, status, transcriptionText, requestTranscription]);
-
-  // Generate AI Voice Summary if transcript is long enough
-  useEffect(() => {
-    if (
-      transcriptionText &&
-      transcriptionText.length > 25 &&
-      !voiceSummary &&
-      !voiceSummaryMutation.isPending &&
-      !voiceSummaryMutation.isSuccess
-    ) {
-      voiceSummaryMutation.mutate(transcriptionText, {
-        onSuccess: (res) => setVoiceSummary(res),
-      });
-    }
-  }, [transcriptionText, voiceSummary, voiceSummaryMutation]);
 
   if (status === 'PENDING' || status === 'PROCESSING' || requestTranscription.isPending) {
     return (
@@ -304,7 +279,7 @@ function TranscriptionSection({ attachment }: { attachment: MessageAttachment })
           hitSlop={4}
         >
           <View className="flex-row items-center gap-1">
-            <Ionicons name="sparkles" size={12} color="#60a5fa" />
+            <Ionicons name="document-text-outline" size={12} color="#60a5fa" />
             <Text className="text-[11px] font-semibold text-blue-400">
               Transcript
             </Text>
@@ -327,19 +302,6 @@ function TranscriptionSection({ attachment }: { attachment: MessageAttachment })
             <Text className="text-[12px] leading-4 text-white/90">
               {transcriptionText}
             </Text>
-            {voiceSummary ? (
-              <View className="mt-2 rounded-lg bg-blue-500/10 border border-blue-500/20 p-2">
-                <View className="flex-row items-center gap-1">
-                  <Ionicons name="sparkles" size={11} color="#60a5fa" />
-                  <Text className="text-[10px] font-bold uppercase text-blue-400">
-                    AI Voice Summary
-                  </Text>
-                </View>
-                <Text className="mt-0.5 text-[11px] leading-4 text-white/85">
-                  {voiceSummary}
-                </Text>
-              </View>
-            ) : null}
           </View>
         ) : null}
       </View>
@@ -884,7 +846,6 @@ function MessageBubble({
   onJumpToMessage,
   isHighlighted,
   isPeerOnline,
-  translatedText,
 }: {
   message: DirectMessage;
   isOwn: boolean;
@@ -898,7 +859,6 @@ function MessageBubble({
   onJumpToMessage: (messageUuid: string) => void;
   isHighlighted: boolean;
   isPeerOnline?: boolean;
-  translatedText?: string | null;
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const translateX = useRef(new Animated.Value(0)).current;
@@ -1289,16 +1249,6 @@ function MessageBubble({
                 </Text>
               ) : null}
 
-              {translatedText ? (
-                <View className="mt-2 border-t border-white/10 pt-1.5">
-                  <View className="flex-row items-center gap-1">
-                    <Ionicons name="language" size={12} color="#60a5fa" />
-                    <Text className="text-[11px] font-semibold text-blue-400">AI Translation</Text>
-                  </View>
-                  <Text className="mt-0.5 text-[13px] leading-4 text-white/90">{translatedText}</Text>
-                </View>
-              ) : null}
-
               {!isAudioOnlyMessage ? (
                 <View className="mt-1 flex-row items-center justify-end gap-1">
                   {message.isEdited ? (
@@ -1374,47 +1324,8 @@ export default function ChatScreen() {
   const [isMediaGalleryVisible, setIsMediaGalleryVisible] = useState(false);
   const { pinned, pinMessage, unpinMessage } = usePinnedMessage(conversationUuid);
 
-  // ── AI Features state & handlers ──
-  const [isSummaryModalVisible, setIsSummaryModalVisible] = useState(false);
   const [isGroupInfoVisible, setIsGroupInfoVisible] = useState(false);
-  const [summaryData, setSummaryData] = useState<ChatSummaryResult | null>(null);
-  const [translationsMap, setTranslationsMap] = useState<Record<string, string>>({});
-
-  const summaryMutation = useAIChatSummary();
-  const translateMutation = useAITranslation();
-  const grammarFixMutation = useAIGrammarFix();
-
-  function handleGenerateSummary() {
-    setIsSummaryModalVisible(true);
-    summaryMutation.mutate(messages, {
-      onSuccess: (result) => setSummaryData(result),
-    });
-  }
-
-  function handleTranslateAction() {
-    if (!actionMessage?.content?.trim()) return;
-    const msgUuid = actionMessage.uuid;
-    translateMutation.mutate(
-      { text: actionMessage.content },
-      {
-        onSuccess: (res) => {
-          setTranslationsMap((prev) => ({
-            ...prev,
-            [msgUuid]: res.translatedText,
-          }));
-        },
-      }
-    );
-  }
-
-  function handleGrammarFix() {
-    if (!content.trim() || grammarFixMutation.isPending) return;
-    grammarFixMutation.mutate(content, {
-      onSuccess: (res) => {
-        setContent(res.correctedText);
-      },
-    });
-  }
+  const [isUserInfoVisible, setIsUserInfoVisible] = useState(false);
 
   const isInitialLoadRef = useRef(true);
   const showScrollToBottomRef = useRef(false);
@@ -1863,7 +1774,7 @@ export default function ChatScreen() {
         </Pressable>
 
         <Pressable
-          onPress={() => isGroup && setIsGroupInfoVisible(true)}
+          onPress={() => (isGroup ? setIsGroupInfoVisible(true) : setIsUserInfoVisible(true))}
           className="flex-row items-center flex-1 gap-3 min-w-0"
         >
           <View>
@@ -1885,25 +1796,13 @@ export default function ChatScreen() {
               </Text>
             ) : (
               <Text numberOfLines={1} className="text-[12px] text-white/40">
-                {isOnline ? 'Active now' : 'Offline'}
+                {isOnline ? 'Active now' : 'Offline'} · tap for info
               </Text>
             )}
           </View>
         </Pressable>
 
         <View className="flex-row items-center gap-1">
-          <Pressable
-            hitSlop={8}
-            className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
-          >
-            <Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.7)" />
-          </Pressable>
-          <Pressable
-            hitSlop={8}
-            className="h-9 w-9 items-center justify-center rounded-full active:bg-white/10"
-          >
-            <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.7)" />
-          </Pressable>
 
           <View className="relative z-50">
             <Pressable
@@ -1920,7 +1819,7 @@ export default function ChatScreen() {
                   className="absolute right-3 rounded-xl bg-[#2a2a2a] py-2 w-48 border border-white/10"
                   style={{ top: insets.top + 45, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10 }}
                 >
-                  {isGroup && (
+                  {isGroup ? (
                     <Pressable
                       className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
                       onPress={() => {
@@ -1931,17 +1830,19 @@ export default function ChatScreen() {
                       <Ionicons name="information-circle-outline" size={18} color="#60a5fa" />
                       <Text className="text-blue-400 font-semibold text-[15px]">Group Info</Text>
                     </Pressable>
+                  ) : (
+                    <Pressable
+                      className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
+                      onPress={() => {
+                        setIsMenuOpen(false);
+                        setIsUserInfoVisible(true);
+                      }}
+                    >
+                      <Ionicons name="information-circle-outline" size={18} color="#60a5fa" />
+                      <Text className="text-blue-400 font-semibold text-[15px]">Contact Info</Text>
+                    </Pressable>
                   )}
-                  <Pressable
-                    className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
-                    onPress={() => {
-                      setIsMenuOpen(false);
-                      handleGenerateSummary();
-                    }}
-                  >
-                    <Ionicons name="sparkles" size={18} color="#60a5fa" />
-                    <Text className="text-blue-400 font-semibold text-[15px]">AI Chat Summary</Text>
-                  </Pressable>
+
                   <Pressable
                     className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
                     onPress={() => {
@@ -2097,7 +1998,6 @@ export default function ChatScreen() {
                       onJumpToMessage={handleJumpToMessage}
                       isHighlighted={highlightedMessageUuid === message.uuid}
                       isPeerOnline={isOnline}
-                      translatedText={translationsMap[message.uuid]}
                     />
                   );
                 }}
@@ -2209,12 +2109,7 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
-        <AIReplySuggestionsRow
-          lastMessageContent={lastMessage?.content ?? null}
-          senderName={name}
-          onSelectSuggestion={(text) => setContent(text)}
-          visible={!content.trim() && voiceRecorderPhase === 'idle'}
-        />
+
 
         <View
           className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 pt-3"
@@ -2244,19 +2139,7 @@ export default function ChatScreen() {
                     }}
                   />
                 ) : null}
-                {content.trim().length > 0 ? (
-                  <Pressable
-                    onPress={handleGrammarFix}
-                    hitSlop={6}
-                    className="mr-2 h-7 w-7 items-center justify-center rounded-full bg-blue-500/20 active:bg-blue-500/30"
-                  >
-                    {grammarFixMutation.isPending ? (
-                      <Loader size={13} color="#60a5fa" />
-                    ) : (
-                      <Ionicons name="sparkles" size={14} color="#60a5fa" />
-                    )}
-                  </Pressable>
-                ) : null}
+
                 <TextInput
                   ref={textInputRef}
                   value={content}
@@ -2351,7 +2234,6 @@ export default function ChatScreen() {
         onForward={handleActionForward}
         onPin={handleActionPin}
         onUnpin={handleActionUnpin}
-        onTranslate={handleTranslateAction}
       />
 
       <ForwardPicker
@@ -2399,19 +2281,22 @@ export default function ChatScreen() {
         onSend={handlePreviewSend}
       />
 
-      <AISummaryModal
-        visible={isSummaryModalVisible}
-        onClose={() => setIsSummaryModalVisible(false)}
-        summary={summaryData}
-        isLoading={summaryMutation.isPending}
-        chatName={name}
-      />
+
 
       <GroupInfoModal
         visible={isGroupInfoVisible}
         groupUuid={conversationUuid}
         groupName={name}
         onClose={() => setIsGroupInfoVisible(false)}
+      />
+
+      <UserInfoModal
+        visible={isUserInfoVisible}
+        name={name}
+        profilePicUrl={profilePicUrl}
+        isOnline={isOnline}
+        onClose={() => setIsUserInfoVisible(false)}
+        onOpenMediaGallery={() => setIsMediaGalleryVisible(true)}
       />
     </View>
   );

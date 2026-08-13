@@ -21,7 +21,10 @@ import type { Chat, ChatListFilter, DirectChat } from '@/hooks/use-direct-chats'
 import { useOrganizationMembers } from '@/hooks/use-organization-members';
 import type { Member } from '@/hooks/use-organization-members';
 import { Loader } from '@/components/ui/Loader';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CreateGroupModal } from '@/components/chat/create-group-modal';
+import { CreateUserModal } from '@/components/admin/create-user-modal';
 
 const FILTER_TABS: Array<{ value: ChatListFilter; label: string }> = [
   { value: 'ALL', label: 'All' },
@@ -102,6 +105,13 @@ export default function ChatsScreen() {
   const [search, setSearch] = useState('');
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+
+  const isAdmin =
+    user?.userTypeCode === 'ADMIN' ||
+    user?.userTypeCode === 'ORG_ADMIN' ||
+    user?.userTypeCode?.toUpperCase().includes('ADMIN') ||
+    (user as any)?.role === 'ADMIN';
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
@@ -182,11 +192,11 @@ export default function ChatsScreen() {
         </View>
 
         <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 border border-white/5">
-          <Ionicons name={searchInput.trim() ? "sparkles" : "search"} size={18} color={searchInput.trim() ? "#60a5fa" : "rgba(255,255,255,0.5)"} />
+          <Ionicons name="search" size={18} color="rgba(255,255,255,0.5)" />
           <TextInput
             value={searchInput}
             onChangeText={setSearchInput}
-            placeholder="AI Smart Search chats (e.g. invoice sent last month)..."
+            placeholder="Search chats..."
             placeholderTextColor="rgba(255,255,255,0.4)"
             returnKeyType="search"
             className="flex-1 text-[14px] text-white"
@@ -327,6 +337,49 @@ export default function ChatsScreen() {
         />
       )}
 
+      {/* Floating Action Button (Vloq Dark Grey Theme for Admin Create User) */}
+      {isAdmin ? (
+        <Pressable
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setIsCreateUserOpen(true);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: Math.max(insets.bottom, 16) + 110,
+            right: 20,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            overflow: 'hidden',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            elevation: 8,
+            zIndex: 50,
+          }}
+          className="active:scale-95"
+        >
+          <LinearGradient
+            colors={['#3a3d3c', '#242625']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: '100%',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.15)',
+              borderRadius: 28,
+            }}
+          >
+            <Ionicons name="person-add" size={23} color="#ffffff" />
+          </LinearGradient>
+        </Pressable>
+      ) : null}
+
       <CreateGroupModal
         visible={isCreateGroupOpen}
         onClose={() => setIsCreateGroupOpen(false)}
@@ -342,6 +395,10 @@ export default function ChatsScreen() {
             },
           });
         }}
+      />
+      <CreateUserModal
+        visible={isCreateUserOpen}
+        onClose={() => setIsCreateUserOpen(false)}
       />
     </View>
   );

@@ -174,26 +174,6 @@ export function GroupInfoModal({
               {/* Quick Action Buttons */}
               <View style={s.actionRow}>
                 <Pressable
-                  onPress={() => Alert.alert('Audio Call', 'Call feature starting...')}
-                  style={s.actionCard}
-                >
-                  <View style={s.actionIconBox}>
-                    <Ionicons name="call-outline" size={20} color="#60a5fa" />
-                  </View>
-                  <Text style={s.actionLabel}>Audio</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => Alert.alert('Video Call', 'Video feature starting...')}
-                  style={s.actionCard}
-                >
-                  <View style={s.actionIconBox}>
-                    <Ionicons name="videocam-outline" size={20} color="#60a5fa" />
-                  </View>
-                  <Text style={s.actionLabel}>Video</Text>
-                </Pressable>
-
-                <Pressable
                   onPress={() => setIsAddMemberVisible(true)}
                   style={s.actionCard}
                 >

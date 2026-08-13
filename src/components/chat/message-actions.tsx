@@ -33,7 +33,6 @@ export function MessageActionsSheet({
   onUnpin,
   onEdit,
   onDelete,
-  onTranslate,
 }: {
   visible: boolean;
   message: DirectMessage | null;
@@ -45,7 +44,6 @@ export function MessageActionsSheet({
   onUnpin: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
-  onTranslate?: () => void;
 }) {
   const slideAnim = useRef(new Animated.Value(300)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -143,17 +141,6 @@ export function MessageActionsSheet({
               animateClose();
             },
           },
-          ...(onTranslate
-            ? [
-                {
-                  key: 'translate',
-                  label: 'Translate Message (AI)',
-                  icon: 'language-outline' as const,
-                  iconColor: 'rgba(255,255,255,0.85)',
-                  onPress: () => handleAction(onTranslate),
-                },
-              ]
-            : []),
         ]
       : []),
     isPinned
