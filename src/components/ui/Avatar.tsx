@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { getInitials } from "@/lib/utils";
 
 const COLORS = [
@@ -19,10 +20,11 @@ type AvatarProps = {
   name: string;
   url?: string | null;
   size?: number;
+  isGroup?: boolean;
 };
 
-export function Avatar({ name, url, size = 44 }: AvatarProps) {
-  const bg = getColor(name);
+export function Avatar({ name, url, size = 44, isGroup = false }: AvatarProps) {
+  const bg = isGroup ? "#6366f1" : getColor(name);
   const fontSize = size * 0.38;
 
   if (url) {
@@ -32,6 +34,19 @@ export function Avatar({ name, url, size = 44 }: AvatarProps) {
         style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
         contentFit="cover"
       />
+    );
+  }
+
+  if (isGroup) {
+    return (
+      <View
+        style={[
+          styles.placeholder,
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: "#6366f1" },
+        ]}
+      >
+        <Ionicons name="people" size={size * 0.52} color="#ffffff" />
+      </View>
     );
   }
 

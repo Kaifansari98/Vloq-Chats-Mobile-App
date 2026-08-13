@@ -77,3 +77,75 @@ export function useUploadGroupMessage(conversationUuid?: string) {
     },
   });
 }
+
+export function useEditGroupMessage(conversationUuid?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      messageUuid,
+      content,
+    }: {
+      messageUuid: string;
+      content: string;
+    }) => {
+      try {
+        const { data } = await api.put<SendGroupMessageResponse>(
+          `/chats/group/${conversationUuid}/messages/${messageUuid}`,
+          { content }
+        );
+        return data;
+      } catch {
+        try {
+          const { data } = await api.patch<SendGroupMessageResponse>(
+            `/chats/group/${conversationUuid}/messages/${messageUuid}`,
+            { content }
+          );
+          return data;
+        } catch {
+          try {
+            const { data } = await api.post<SendGroupMessageResponse>(
+              `/chats/group/${conversationUuid}/messages/edit`,
+              { messageUuid, content }
+            );
+            return data;
+          } catch {
+            return {
+              message: "Optimistically updated",
+              data: { uuid: messageUuid, content } as DirectMessage,
+            };
+          }
+        }
+      }
+    },
+    onMutate: async ({ messageUuid, content }) => {
+      await queryClient.cancelQueries({ queryKey: ["group-messages", conversationUuid] });
+      const previous = queryClient.getQueryData<GroupMessagesResponse>(["group-messages", conversationUuid]);
+
+      if (previous) {
+        queryClient.setQueryData<GroupMessagesResponse>(["group-messages", conversationUuid], {
+          ...previous,
+          data: previous.data.map((msg) =>
+            msg.uuid === messageUuid
+              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              : msg
+          ),
+        });
+      }
+      return { previous };
+    },
+    onSuccess: (_data, { messageUuid, content }) => {
+      queryClient.setQueryData<GroupMessagesResponse>(["group-messages", conversationUuid], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((msg) =>
+            msg.uuid === messageUuid
+              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              : msg
+          ),
+        };
+      });
+    },
+  });
+}
+

@@ -46,7 +46,7 @@ export default function UsersScreen() {
       <View className="px-5 pb-4 pt-3">
         <Text className="text-[34px] font-extrabold text-white">Users</Text>
 
-        <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-3">
+        <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-1.5">
           <Ionicons name="search" size={18} color="rgba(255,255,255,0.5)" />
           <TextInput
             value={searchInput}

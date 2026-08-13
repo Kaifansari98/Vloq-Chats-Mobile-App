@@ -19,6 +19,9 @@ export type DirectChat = {
     content: string | null;
     type: string;
     createdAt: string;
+    attachmentType?: string | null;
+    mimeType?: string | null;
+    fileName?: string | null;
   } | null;
 };
 
@@ -41,6 +44,9 @@ export type GroupChat = {
     content: string | null;
     type: string;
     createdAt: string;
+    attachmentType?: string | null;
+    mimeType?: string | null;
+    fileName?: string | null;
   } | null;
 };
 

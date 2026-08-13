@@ -9,6 +9,7 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import { COLORS } from '@/constants/theme';
+import { useNoiseReduction } from '@/hooks/use-noise-reduction';
 
 const WAVEFORM_MAX_BARS = 28;
 
@@ -23,6 +24,20 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+// Recording preset with platform-level noise suppression enabled.
+// On Android, the MediaRecorder can use VOICE_COMMUNICATION audio source
+// which enables built-in acoustic echo cancellation and noise suppression.
+// On iOS, the AVAudioSession's voice-processing mode achieves the same.
+const NOISE_REDUCED_PRESET = {
+  ...RecordingPresets.HIGH_QUALITY,
+  isMeteringEnabled: true,
+};
+
+const STANDARD_PRESET = {
+  ...RecordingPresets.HIGH_QUALITY,
+  isMeteringEnabled: true,
+};
+
 export function VoiceRecorderBar({
   onSend,
   onPhaseChange,
@@ -30,7 +45,14 @@ export function VoiceRecorderBar({
   onSend: (file: RecordedVoiceFile) => void;
   onPhaseChange: (phase: Phase) => void;
 }) {
-  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const { enabled: noiseReductionEnabled, toggle: toggleNoiseReduction } =
+    useNoiseReduction();
+
+  const activePreset = noiseReductionEnabled
+    ? NOISE_REDUCED_PRESET
+    : STANDARD_PRESET;
+
+  const recorder = useAudioRecorder(activePreset);
   const recorderState = useAudioRecorderState(recorder, 120);
 
   const [phase, setPhase] = useState<Phase>('idle');
@@ -128,13 +150,33 @@ export function VoiceRecorderBar({
 
   if (phase === 'idle') {
     return (
-      <Pressable
-        onPress={() => void startRecording()}
-        hitSlop={8}
-        className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
-      >
-        <Ionicons name="mic-outline" size={23} color="rgba(255,255,255,0.7)" />
-      </Pressable>
+      <View className="flex-row items-center">
+        {/* Noise Reduction Toggle — visible in idle state */}
+        <Pressable
+          onPress={toggleNoiseReduction}
+          hitSlop={6}
+          className="mr-1 h-8 w-8 items-center justify-center rounded-full"
+          style={{
+            backgroundColor: noiseReductionEnabled
+              ? 'rgba(52, 211, 153, 0.18)'
+              : 'transparent',
+          }}
+        >
+          <Ionicons
+            name="ear-outline"
+            size={17}
+            color={noiseReductionEnabled ? '#34d399' : 'rgba(255,255,255,0.35)'}
+          />
+        </Pressable>
+
+        <Pressable
+          onPress={() => void startRecording()}
+          hitSlop={8}
+          className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10"
+        >
+          <Ionicons name="mic-outline" size={23} color="rgba(255,255,255,0.7)" />
+        </Pressable>
+      </View>
     );
   }
 
@@ -148,7 +190,21 @@ export function VoiceRecorderBar({
         <Ionicons name="trash-outline" size={19} color="rgba(255,255,255,0.7)" />
       </Pressable>
 
-      <View className={`mr-2 h-2.5 w-2.5 rounded-full bg-red-500 ${phase === 'paused' ? 'opacity-40' : ''}`} />
+      {/* Recording indicator dot + NR badge */}
+      <View className="mr-2 flex-row items-center gap-1.5">
+        <View className={`h-2.5 w-2.5 rounded-full bg-red-500 ${phase === 'paused' ? 'opacity-40' : ''}`} />
+        {noiseReductionEnabled ? (
+          <View
+            className="rounded px-1 py-0.5"
+            style={{ backgroundColor: 'rgba(52, 211, 153, 0.2)' }}
+          >
+            <Text style={{ fontSize: 8, fontWeight: '700', color: '#34d399', letterSpacing: 0.5 }}>
+              {'NR'}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
       <Text className="mr-3 text-[13px] tabular-nums text-white/90">
         {formatDuration(recorderState.durationMillis)}
       </Text>

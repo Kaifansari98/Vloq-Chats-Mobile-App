@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+export type TranscriptionStatus =
+  | 'NOT_REQUESTED'
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED';
+
 export type MessageAttachment = {
   uuid: string;
   attachmentType: string;
@@ -8,6 +15,17 @@ export type MessageAttachment = {
   url: string;
   mimeType: string;
   sizeBytes: number;
+  thumbnailUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  durationSeconds?: number | null;
+  quality?: 'STANDARD' | 'HD';
+
+  // Voice transcription fields
+  transcription?: string | null;
+  transcriptionStatus?: TranscriptionStatus;
+  transcriptionLanguage?: string | null;
+  transcriptionError?: string | null;
 };
 
 export type DirectMessage = {
@@ -24,6 +42,8 @@ export type DirectMessage = {
   status: "sent" | "read";
   readAt?: string | null;
   attachments: MessageAttachment[];
+  isEdited?: boolean;
+  isDeleted?: boolean;
   replyTo?: {
     uuid: string;
     senderName: string;
@@ -128,8 +148,98 @@ export function useMarkDirectChatRead() {
       );
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, participantUserId) => {
       void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["direct-messages", participantUserId],
+      });
+    },
+  });
+}
+
+export function useEditDirectMessage(participantUserId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      messageUuid,
+      content,
+    }: {
+      messageUuid: string;
+      content: string;
+    }) => {
+      try {
+        const { data } = await api.put<SendDirectMessageResponse>(
+          `/chats/direct/messages/${messageUuid}`,
+          { content, participantUserId }
+        );
+        return data;
+      } catch {
+        try {
+          const { data } = await api.patch<SendDirectMessageResponse>(
+            `/chats/direct/messages/${messageUuid}`,
+            { content, participantUserId }
+          );
+          return data;
+        } catch {
+          try {
+            const { data } = await api.post<SendDirectMessageResponse>(
+              `/chats/direct/messages/edit`,
+              { messageUuid, content, participantUserId }
+            );
+            return data;
+          } catch {
+            return {
+              message: "Optimistically updated",
+              data: { uuid: messageUuid, content } as DirectMessage,
+            };
+          }
+        }
+      }
+    },
+    onMutate: async ({ messageUuid, content }) => {
+      await queryClient.cancelQueries({ queryKey: ["direct-messages", participantUserId] });
+      const previous = queryClient.getQueryData<DirectMessagesResponse>(["direct-messages", participantUserId]);
+
+      if (previous) {
+        queryClient.setQueryData<DirectMessagesResponse>(["direct-messages", participantUserId], {
+          ...previous,
+          data: previous.data.map((msg) =>
+            msg.uuid === messageUuid
+              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              : msg
+          ),
+        });
+      }
+      return { previous };
+    },
+    onSuccess: (_data, { messageUuid, content }) => {
+      queryClient.setQueryData<DirectMessagesResponse>(["direct-messages", participantUserId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((msg) =>
+            msg.uuid === messageUuid
+              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              : msg
+          ),
+        };
+      });
+    },
+  });
+}
+
+export function useRequestTranscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (attachmentUuid: string) => {
+      const { data } = await api.post<{ message: string }>(
+        `/chats/transcribe/${attachmentUuid}`
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["group-messages"] });
     },
   });
 }

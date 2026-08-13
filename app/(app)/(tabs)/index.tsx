@@ -13,6 +13,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { TextShimmerWave } from '@/components/text-shimmer-wave';
 import { formatChatTime } from '@/lib/utils';
+import { getLastMessagePreview as getLastMsgPreview } from '@/lib/message-preview';
 import { useAuth } from '@/hooks/use-auth';
 import { useChatSocketState } from '@/hooks/use-chat-socket';
 import { useDirectChats } from '@/hooks/use-direct-chats';
@@ -20,6 +21,7 @@ import type { Chat, ChatListFilter, DirectChat } from '@/hooks/use-direct-chats'
 import { useOrganizationMembers } from '@/hooks/use-organization-members';
 import type { Member } from '@/hooks/use-organization-members';
 import { Loader } from '@/components/ui/Loader';
+import { CreateGroupModal } from '@/components/chat/create-group-modal';
 
 const FILTER_TABS: Array<{ value: ChatListFilter; label: string }> = [
   { value: 'ALL', label: 'All' },
@@ -27,13 +29,11 @@ const FILTER_TABS: Array<{ value: ChatListFilter; label: string }> = [
   { value: 'GROUPS', label: 'Group' },
 ];
 
-type PreviewIcon = React.ComponentProps<typeof Ionicons>['name'];
-
 type ConversationItem = {
   id: string;
   name: string;
   profilePicUrl: string | null;
-  preview: { icon: PreviewIcon | null; text: string };
+  preview: { icon: string | null; text: string };
   timeLabel: string;
   unreadCount: number;
   latestActivityAt: number;
@@ -53,22 +53,9 @@ function getChatMeta(chat: Chat) {
 
 function getLastMessagePreview(
   lastMessage: Chat['lastMessage']
-): { icon: PreviewIcon | null; text: string } {
-  if (!lastMessage) return { icon: null, text: 'No messages yet' };
-  if (lastMessage.content?.trim()) return { icon: null, text: lastMessage.content };
-
-  switch (lastMessage.type) {
-    case 'IMAGE':
-      return { icon: 'camera', text: 'Photo' };
-    case 'VIDEO':
-      return { icon: 'videocam', text: 'Video' };
-    case 'AUDIO':
-      return { icon: 'mic', text: 'Audio' };
-    case 'FILE':
-      return { icon: 'document', text: 'Document' };
-    default:
-      return { icon: null, text: 'New message' };
-  }
+): { icon: string | null; text: string } {
+  const preview = getLastMsgPreview(lastMessage);
+  return { icon: preview.icon, text: preview.label };
 }
 
 function getActivityTimestamp(dateString?: string | null): number {
@@ -114,6 +101,7 @@ export default function ChatsScreen() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
@@ -182,17 +170,26 @@ export default function ChatsScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pb-4 pt-3">
-        <Text className="text-[34px] font-extrabold text-white">Chats</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-[34px] font-extrabold text-white">Chats</Text>
+          <Pressable
+            onPress={() => setIsCreateGroupOpen(true)}
+            className="flex-row items-center gap-1.5 rounded-full bg-white/10 border border-white/10 px-3.5 py-1.5 active:bg-white/20"
+          >
+            <Ionicons name="people" size={16} color="#ffffff" />
+            <Text className="text-[12px] font-semibold text-white">New Group</Text>
+          </Pressable>
+        </View>
 
-        <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-2">
-          <Ionicons name="search" size={18} color="rgba(255,255,255,0.5)" />
+        <View className="mt-4 flex-row items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 border border-white/5">
+          <Ionicons name={searchInput.trim() ? "sparkles" : "search"} size={18} color={searchInput.trim() ? "#60a5fa" : "rgba(255,255,255,0.5)"} />
           <TextInput
             value={searchInput}
             onChangeText={setSearchInput}
-            placeholder="Search chats"
-            placeholderTextColor="rgba(255,255,255,0.5)"
+            placeholder="AI Smart Search chats (e.g. invoice sent last month)..."
+            placeholderTextColor="rgba(255,255,255,0.4)"
             returnKeyType="search"
-            className="flex-1 text-[15px] text-white"
+            className="flex-1 text-[14px] text-white"
           />
         </View>
 
@@ -265,7 +262,7 @@ export default function ChatsScreen() {
                 className="flex-row items-center gap-3 px-5 py-3 active:bg-white/5"
               >
                 <View>
-                  <Avatar name={item.name} url={item.profilePicUrl} size={48} />
+                  <Avatar name={item.name} url={item.profilePicUrl} size={48} isGroup={item.isGroup} />
                   {isOnline ? (
                     <View className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-400" />
                   ) : null}
@@ -307,7 +304,7 @@ export default function ChatsScreen() {
                       <View className="flex-1 flex-row items-center gap-1">
                         {item.preview.icon ? (
                           <Ionicons
-                            name={item.preview.icon}
+                            name={item.preview.icon as React.ComponentProps<typeof Ionicons>['name']}
                             size={13}
                             color="rgba(255,255,255,0.4)"
                           />
@@ -329,6 +326,23 @@ export default function ChatsScreen() {
           }}
         />
       )}
+
+      <CreateGroupModal
+        visible={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onGroupCreated={(groupUuid, groupName) => {
+          router.push({
+            pathname: '/(app)/chat/[id]',
+            params: {
+              id: groupUuid,
+              isGroup: '1',
+              memberId: '0',
+              name: groupName,
+              profilePicUrl: '',
+            },
+          });
+        }}
+      />
     </View>
   );
 }

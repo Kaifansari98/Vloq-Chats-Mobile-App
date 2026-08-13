@@ -25,7 +25,8 @@
       },
       "backgroundColor": "#111111",
       "predictiveBackGestureEnabled": false,
-      "package": "com.vloq.chats"
+      "package": "com.vloq.chats",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png",
