@@ -17,14 +17,8 @@ import { useDirectChats } from '@/hooks/use-direct-chats';
 import type { Chat, DirectChat, GroupChat } from '@/hooks/use-direct-chats';
 import type { DirectMessage } from '@/hooks/use-direct-messages';
 import { getMessagePreview } from '@/lib/message-preview';
-import {
-  useSendDirectMessage,
-  useUploadDirectMessage,
-} from '@/hooks/use-direct-messages';
-import {
-  useSendGroupMessage,
-  useUploadGroupMessage,
-} from '@/hooks/use-group-messages';
+import { useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 
 type ForwardTarget = {
   id: string;
@@ -121,46 +115,66 @@ export function ForwardPicker({
     });
   }, []);
 
+  const queryClient = useQueryClient();
+
   async function handleForward() {
-    if (!message || selectedIds.size === 0) return;
-    setIsSending(true);
+    console.log('[ForwardPicker] handleForward triggered!');
+    console.log('[ForwardPicker] message:', message);
+    console.log('[ForwardPicker] selectedIds size:', selectedIds.size, 'IDs:', Array.from(selectedIds));
 
-    const forwardContent = message.content
-      ? `↗ Forwarded\n${message.content}`
-      : '↗ Forwarded';
-
-    // We need to signal success even if individual sends fail
-    let successCount = 0;
-    const selectedTargets = targets.filter((t) => selectedIds.has(t.id));
-
-    for (const target of selectedTargets) {
-      try {
-        if (target.isGroup) {
-          const { data } = await (await import('@/lib/api')).api.post(
-            `/chats/group/${target.conversationUuid}/messages`,
-            { content: forwardContent },
-          );
-          if (data) successCount++;
-        } else {
-          const { data } = await (await import('@/lib/api')).api.post(
-            '/chats/direct/messages',
-            {
-              participantUserId: target.memberId,
-              content: forwardContent,
-            },
-          );
-          if (data) successCount++;
-        }
-      } catch (error) {
-        console.error(`Failed to forward to ${target.name}:`, error);
-      }
+    if (!message || selectedIds.size === 0) {
+      console.log('[ForwardPicker] EARLY EXIT: message is null or no items selected');
+      return;
     }
 
-    setIsSending(false);
-    if (successCount > 0) {
-      onForwardComplete();
-      animateClose();
-    } else {
+    setIsSending(true);
+
+    const selectedTargets = targets.filter((t) => selectedIds.has(t.id));
+    console.log('[ForwardPicker] selectedTargets:', JSON.stringify(selectedTargets));
+
+    const targetDirectParticipantUserIds = selectedTargets
+      .filter((t) => !t.isGroup && t.memberId > 0)
+      .map((t) => t.memberId);
+    const targetGroupConversationUuids = selectedTargets
+      .filter((t) => t.isGroup || t.memberId === 0)
+      .map((t) => t.conversationUuid);
+
+    console.log('[ForwardPicker] Payload to send:', {
+      messageUuid: message.uuid,
+      targetDirectParticipantUserIds,
+      targetGroupConversationUuids,
+    });
+
+    try {
+      console.log('[ForwardPicker] Calling api.post /chats/forward ...');
+      const response = await api.post<{ message: string; forwardedCount: number }>(
+        '/chats/forward',
+        {
+          messageUuid: message.uuid,
+          targetDirectParticipantUserIds,
+          targetGroupConversationUuids,
+        },
+      );
+
+      console.log('[ForwardPicker] API Response:', response.data, 'Status:', response.status);
+
+      setIsSending(false);
+
+      if (response.data && response.data.forwardedCount > 0) {
+        console.log('[ForwardPicker] Forward successful! Invalidating queries & closing modal...');
+        void queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+        void queryClient.invalidateQueries({ queryKey: ['direct-messages'] });
+        void queryClient.invalidateQueries({ queryKey: ['group-messages'] });
+
+        onForwardComplete();
+        animateClose();
+      } else {
+        console.warn('[ForwardPicker] Forward response returned 0 count:', response.data);
+        Alert.alert('Forward Failed', 'Could not forward the message. Please try again.');
+      }
+    } catch (error) {
+      setIsSending(false);
+      console.error('[ForwardPicker] Error during forward API call:', error);
       Alert.alert('Forward Failed', 'Could not forward the message. Please try again.');
     }
   }

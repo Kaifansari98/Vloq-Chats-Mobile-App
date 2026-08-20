@@ -174,7 +174,10 @@ export function GroupInfoModal({
               {/* Quick Action Buttons */}
               <View style={s.actionRow}>
                 <Pressable
-                  onPress={() => setIsAddMemberVisible(true)}
+                  onPress={() => {
+                    onClose();
+                    router.push('/(app)/create-group');
+                  }}
                   style={s.actionCard}
                 >
                   <View style={s.actionIconBox}>
@@ -235,7 +238,13 @@ export function GroupInfoModal({
                 <Text style={s.sectionTitle}>
                   {participants.length} MEMBERS
                 </Text>
-                <Pressable onPress={() => setIsAddMemberVisible(true)} hitSlop={6}>
+                <Pressable
+                  onPress={() => {
+                    onClose();
+                    router.push('/(app)/create-group');
+                  }}
+                  hitSlop={6}
+                >
                   <Ionicons name="person-add" size={18} color="#60a5fa" />
                 </Pressable>
               </View>
@@ -250,6 +259,7 @@ export function GroupInfoModal({
                     placeholderTextColor="rgba(255,255,255,0.35)"
                     value={searchMember}
                     onChangeText={setSearchMember}
+                    autoCorrect={false}
                   />
                   {searchMember.length > 0 && (
                     <Pressable onPress={() => setSearchMember('')}>
@@ -261,7 +271,10 @@ export function GroupInfoModal({
 
               {/* Add Member Row Button */}
               <Pressable
-                onPress={() => setIsAddMemberVisible(true)}
+                onPress={() => {
+                  onClose();
+                  router.push('/(app)/create-group');
+                }}
                 style={s.addMemberRow}
               >
                 <View style={s.addMemberIconCircle}>

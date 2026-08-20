@@ -2,18 +2,32 @@ import axios from "axios";
 import { getToken, clearAuth } from "@/lib/storage";
 import { router } from "expo-router";
 
+import Constants from "expo-constants";
+
 const environment =
   (process.env.EXPO_PUBLIC_ENVIRONMENT?.toUpperCase() ?? "PRODUCTION");
 
 const productionApiUrl = "https://api-chat.nexyn.com/";
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
-// Expo public variables are embedded when Metro starts. For LOCAL, use the
-// Mac's LAN IP from .env so a physical phone can reach the Nest server.
+function getLocalApiUrl(): string {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    (Constants as Record<string, any>).manifest?.debuggerHost ||
+    (Constants as Record<string, any>).manifest2?.extra?.expoGo?.developer?.tool;
+
+  if (typeof hostUri === "string" && hostUri.length > 0) {
+    const hostIp = hostUri.split(":")[0];
+    if (hostIp && hostIp !== "localhost" && hostIp !== "127.0.0.1") {
+      return `http://${hostIp}:4000/`;
+    }
+  }
+
+  return configuredApiUrl || "http://192.168.1.105:4000/";
+}
+
 export const API_BASE_URL =
-  environment === "LOCAL" && configuredApiUrl
-    ? configuredApiUrl
-    : productionApiUrl;
+  environment === "LOCAL" ? getLocalApiUrl() : productionApiUrl;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

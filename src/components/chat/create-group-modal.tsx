@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -14,12 +14,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useOrganizationMembers, Member } from '@/hooks/use-organization-members';
 import { useCreateGroupChat } from '@/hooks/use-group-chats';
 import { useAuth } from '@/hooks/use-auth';
+import { COLORS } from '@/constants/theme';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f97316',
@@ -93,7 +97,7 @@ function MemberItem({
           paddingHorizontal: 16,
           paddingVertical: 10,
           backgroundColor: isSelected
-            ? 'rgba(99, 102, 241, 0.12)'
+            ? 'rgba(99, 102, 241, 0.14)'
             : 'transparent',
         }}
       >
@@ -147,9 +151,22 @@ export function CreateGroupModal({
   const [selectedMembers, setSelectedMembers] = useState<Member[]>([]);
   const [search, setSearch] = useState('');
   const [groupName, setGroupName] = useState('');
+  const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
 
   const { data: membersData, isLoading } = useOrganizationMembers(1, search, 100);
   const createGroupMutation = useCreateGroupChat();
+
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      slideAnim.setValue(SCREEN_WIDTH);
+    }
+  }, [visible, slideAnim]);
 
   const members = useMemo(() => {
     const all = (membersData?.data ?? []).filter(
@@ -181,8 +198,14 @@ export function CreateGroupModal({
   }
 
   function handleClose() {
-    reset();
-    onClose();
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_WIDTH,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      reset();
+      onClose();
+    });
   }
 
   async function handleCreate() {
@@ -207,285 +230,293 @@ export function CreateGroupModal({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
+      transparent
       statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <View style={s.root}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
-          >
-            {/* ───── Step 1: Select Members ───── */}
-            {step === 'select' ? (
-              <View style={{ flex: 1 }}>
-                {/* Header bar */}
-                <View style={s.header}>
-                  <Pressable onPress={handleClose} hitSlop={8}>
-                    <View style={s.headerIcon}>
-                      <Ionicons name="close" size={20} color="#fff" />
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}>
+        <Animated.View
+          style={[
+            s.root,
+            { transform: [{ translateX: slideAnim }] },
+          ]}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={{ flex: 1 }}
+            >
+              {/* ───── Step 1: Select Members ───── */}
+              {step === 'select' ? (
+                <View style={{ flex: 1 }}>
+                  {/* Header bar */}
+                  <View style={s.header}>
+                    <Pressable onPress={handleClose} hitSlop={8}>
+                      <View style={s.headerIcon}>
+                        <Ionicons name="arrow-back" size={20} color="#fff" />
+                      </View>
+                    </Pressable>
+
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={s.headerTitle}>Add Members</Text>
+                      <Text style={s.headerSub}>
+                        {selectedIds.size === 0
+                          ? 'Select members'
+                          : `${selectedIds.size} selected`}
+                      </Text>
                     </View>
-                  </Pressable>
 
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={s.headerTitle}>Add Members</Text>
-                    <Text style={s.headerSub}>
-                      {selectedIds.size === 0
-                        ? 'Select members'
-                        : `${selectedIds.size} selected`}
-                    </Text>
-                  </View>
-
-                  <Pressable
-                    onPress={() => setStep('name')}
-                    disabled={selectedIds.size === 0}
-                  >
-                    <View
-                      style={[
-                        s.pillBtn,
-                        selectedIds.size === 0 && { opacity: 0.35 },
-                      ]}
+                    <Pressable
+                      onPress={() => setStep('name')}
+                      disabled={selectedIds.size === 0}
                     >
-                      <Text style={s.pillText}>Next</Text>
-                      <Ionicons
-                        name="arrow-forward"
-                        size={14}
-                        color="#fff"
-                        style={{ marginLeft: 4 }}
-                      />
-                    </View>
-                  </Pressable>
-                </View>
-
-                {/* Search */}
-                <View style={s.searchWrap}>
-                  <View style={s.searchRow}>
-                    <Ionicons name="search" size={17} color="#60a5fa" />
-                    <TextInput
-                      style={s.searchInput}
-                      placeholder="Search name or email..."
-                      placeholderTextColor="rgba(255,255,255,0.4)"
-                      value={search}
-                      onChangeText={setSearch}
-                      autoCorrect={false}
-                    />
-                    {search.length > 0 && (
-                      <Pressable onPress={() => setSearch('')} hitSlop={6}>
-                        <Ionicons
-                          name="close-circle"
-                          size={17}
-                          color="rgba(255,255,255,0.5)"
-                        />
-                      </Pressable>
-                    )}
-                  </View>
-                </View>
-
-                {/* Selected chips */}
-                {selectedMembers.length > 0 && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={s.chipsBar}
-                    contentContainerStyle={{ paddingHorizontal: 16 }}
-                  >
-                    {selectedMembers.map((m) => (
-                      <Pressable
-                        key={m.id}
-                        onPress={() => toggleMember(m)}
-                        style={{ alignItems: 'center', marginRight: 14, width: 50 }}
-                      >
-                        <View style={{ position: 'relative' }}>
-                          <MemberAvatar member={m} size={38} />
-                          <View style={s.chipX}>
-                            <Ionicons name="close" size={10} color="#fff" />
-                          </View>
-                        </View>
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            fontSize: 11,
-                            color: 'rgba(255,255,255,0.7)',
-                            marginTop: 3,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {m.name.split(' ')[0]}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                )}
-
-                {/* Member list */}
-                {isLoading ? (
-                  <View style={s.center}>
-                    <ActivityIndicator size="large" color="#6366f1" />
-                    <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12 }}>
-                      Loading...
-                    </Text>
-                  </View>
-                ) : members.length === 0 ? (
-                  <View style={s.center}>
-                    <Ionicons
-                      name="people-outline"
-                      size={44}
-                      color="rgba(255,255,255,0.2)"
-                    />
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-                      No members found
-                    </Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={members}
-                    keyExtractor={(item) => String(item.id)}
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{ paddingBottom: 40 }}
-                    ItemSeparatorComponent={() => (
                       <View
-                        style={{
-                          height: StyleSheet.hairlineWidth,
-                          backgroundColor: 'rgba(255,255,255,0.06)',
-                          marginLeft: 72,
-                        }}
-                      />
-                    )}
-                    renderItem={({ item }) => (
-                      <MemberItem
-                        member={item}
-                        isSelected={selectedIds.has(item.id)}
-                        onToggle={() => toggleMember(item)}
-                      />
-                    )}
-                  />
-                )}
-              </View>
-            ) : (
-              /* ───── Step 2: Name the Group ───── */
-              <View style={{ flex: 1 }}>
-                <View style={s.header}>
-                  <Pressable onPress={() => setStep('select')} hitSlop={8}>
-                    <View style={s.headerIcon}>
-                      <Ionicons name="arrow-back" size={20} color="#fff" />
-                    </View>
-                  </Pressable>
-
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={s.headerTitle}>New Group</Text>
-                    <Text style={s.headerSub}>
-                      {selectedMembers.length}{' '}
-                      {selectedMembers.length === 1 ? 'member' : 'members'}
-                    </Text>
+                        style={[
+                          s.pillBtn,
+                          selectedIds.size === 0 && { opacity: 0.35 },
+                        ]}
+                      >
+                        <Text style={s.pillText}>Next</Text>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={14}
+                          color="#fff"
+                          style={{ marginLeft: 4 }}
+                        />
+                      </View>
+                    </Pressable>
                   </View>
 
-                  <Pressable
-                    onPress={() => void handleCreate()}
-                    disabled={
-                      !groupName.trim() || createGroupMutation.isPending
-                    }
-                  >
-                    <View
-                      style={[
-                        s.pillBtn,
-                        (!groupName.trim() || createGroupMutation.isPending) && {
-                          opacity: 0.35,
-                        },
-                      ]}
-                    >
-                      {createGroupMutation.isPending ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={s.pillText}>Create</Text>
+                  {/* Search */}
+                  <View style={s.searchWrap}>
+                    <View style={s.searchRow}>
+                      <Ionicons name="search" size={17} color="#818cf8" />
+                      <TextInput
+                        style={s.searchInput}
+                        placeholder="Search name or email..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={search}
+                        onChangeText={setSearch}
+                        autoCorrect={false}
+                      />
+                      {search.length > 0 && (
+                        <Pressable onPress={() => setSearch('')} hitSlop={6}>
+                          <Ionicons
+                            name="close-circle"
+                            size={17}
+                            color="rgba(255,255,255,0.5)"
+                          />
+                        </Pressable>
                       )}
                     </View>
-                  </Pressable>
-                </View>
-
-                <ScrollView
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-                >
-                  {/* Group name card */}
-                  <View style={s.groupCard}>
-                    <View style={s.groupIcon}>
-                      <Ionicons name="people" size={28} color="#fff" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '700',
-                          color: '#818cf8',
-                          letterSpacing: 1,
-                          marginBottom: 4,
-                        }}
-                      >
-                        GROUP NAME
-                      </Text>
-                      <TextInput
-                        style={{
-                          fontSize: 16,
-                          color: '#fff',
-                          paddingVertical: 2,
-                          borderBottomWidth: 1,
-                          borderBottomColor: '#6366f1',
-                        }}
-                        placeholder="Enter group subject..."
-                        placeholderTextColor="rgba(255,255,255,0.35)"
-                        value={groupName}
-                        onChangeText={setGroupName}
-                        maxLength={80}
-                        autoFocus
-                      />
-                    </View>
                   </View>
 
-                  {/* Participant list */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: 'rgba(255,255,255,0.4)',
-                      letterSpacing: 1,
-                      marginBottom: 10,
-                    }}
-                  >
-                    MEMBERS ({selectedMembers.length})
-                  </Text>
-
-                  {selectedMembers.map((m) => (
-                    <View
-                      key={m.id}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: 8,
-                      }}
+                  {/* Selected chips */}
+                  {selectedMembers.length > 0 && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={s.chipsBar}
+                      contentContainerStyle={{ paddingHorizontal: 16 }}
                     >
-                      <MemberAvatar member={m} size={42} />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
-                          {m.name}
-                        </Text>
+                      {selectedMembers.map((m) => (
+                        <Pressable
+                          key={m.id}
+                          onPress={() => toggleMember(m)}
+                          style={{ alignItems: 'center', marginRight: 14, width: 50 }}
+                        >
+                          <View style={{ position: 'relative' }}>
+                            <MemberAvatar member={m} size={38} />
+                            <View style={s.chipX}>
+                              <Ionicons name="close" size={10} color="#fff" />
+                            </View>
+                          </View>
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              fontSize: 11,
+                              color: 'rgba(255,255,255,0.7)',
+                              marginTop: 3,
+                              textAlign: 'center',
+                            }}
+                          >
+                            {m.name.split(' ')[0]}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
+
+                  {/* Member list */}
+                  {isLoading ? (
+                    <View style={s.center}>
+                      <ActivityIndicator size="large" color="#6366f1" />
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12 }}>
+                        Loading...
+                      </Text>
+                    </View>
+                  ) : members.length === 0 ? (
+                    <View style={s.center}>
+                      <Ionicons
+                        name="people-outline"
+                        size={44}
+                        color="rgba(255,255,255,0.2)"
+                      />
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+                        No members found
+                      </Text>
+                    </View>
+                  ) : (
+                    <FlatList
+                      data={members}
+                      keyExtractor={(item) => String(item.id)}
+                      style={{ flex: 1 }}
+                      contentContainerStyle={{ paddingBottom: 40 }}
+                      ItemSeparatorComponent={() => (
+                        <View
+                          style={{
+                            height: StyleSheet.hairlineWidth,
+                            backgroundColor: 'rgba(255,255,255,0.06)',
+                            marginLeft: 72,
+                          }}
+                        />
+                      )}
+                      renderItem={({ item }) => (
+                        <MemberItem
+                          member={item}
+                          isSelected={selectedIds.has(item.id)}
+                          onToggle={() => toggleMember(item)}
+                        />
+                      )}
+                    />
+                  )}
+                </View>
+              ) : (
+                /* ───── Step 2: Name the Group ───── */
+                <View style={{ flex: 1 }}>
+                  <View style={s.header}>
+                    <Pressable onPress={() => setStep('select')} hitSlop={8}>
+                      <View style={s.headerIcon}>
+                        <Ionicons name="arrow-back" size={20} color="#fff" />
+                      </View>
+                    </Pressable>
+
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={s.headerTitle}>New Group</Text>
+                      <Text style={s.headerSub}>
+                        {selectedMembers.length}{' '}
+                        {selectedMembers.length === 1 ? 'member' : 'members'}
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      onPress={() => void handleCreate()}
+                      disabled={
+                        !groupName.trim() || createGroupMutation.isPending
+                      }
+                    >
+                      <View
+                        style={[
+                          s.pillBtn,
+                          (!groupName.trim() || createGroupMutation.isPending) && {
+                            opacity: 0.35,
+                          },
+                        ]}
+                      >
+                        {createGroupMutation.isPending ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={s.pillText}>Create</Text>
+                        )}
+                      </View>
+                    </Pressable>
+                  </View>
+
+                  <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+                  >
+                    {/* Group name card */}
+                    <View style={s.groupCard}>
+                      <View style={s.groupIcon}>
+                        <Ionicons name="people" size={28} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 14 }}>
                         <Text
                           style={{
-                            fontSize: 12,
-                            color: 'rgba(255,255,255,0.45)',
-                            marginTop: 1,
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: '#818cf8',
+                            letterSpacing: 1,
+                            marginBottom: 4,
                           }}
                         >
-                          {m.email}
+                          GROUP NAME
                         </Text>
+                        <TextInput
+                          style={{
+                            fontSize: 16,
+                            color: '#fff',
+                            paddingVertical: 2,
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#6366f1',
+                          }}
+                          placeholder="Enter group subject..."
+                          placeholderTextColor="rgba(255,255,255,0.35)"
+                          value={groupName}
+                          onChangeText={setGroupName}
+                          maxLength={80}
+                          autoFocus
+                        />
                       </View>
                     </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </KeyboardAvoidingView>
-        </SafeAreaView>
+
+                    {/* Participant list */}
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: 'rgba(255,255,255,0.4)',
+                        letterSpacing: 1,
+                        marginBottom: 10,
+                      }}
+                    >
+                      MEMBERS ({selectedMembers.length})
+                    </Text>
+
+                    {selectedMembers.map((m) => (
+                      <View
+                        key={m.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <MemberAvatar member={m} size={42} />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
+                            {m.name}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: 'rgba(255,255,255,0.45)',
+                              marginTop: 1,
+                            }}
+                          >
+                            {m.email}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -496,7 +527,7 @@ export function CreateGroupModal({
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: COLORS.background,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
   },
   header: {
@@ -505,7 +536,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: COLORS.background,
   },
   headerIcon: {
     width: 36,
@@ -528,15 +560,15 @@ const s = StyleSheet.create({
   pillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(99, 102, 241, 0.25)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12,
+    borderColor: '#6366f1',
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
   },
   pillText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },
@@ -575,7 +607,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#0f172a',
+    borderColor: COLORS.background,
   },
   center: {
     flex: 1,
@@ -589,6 +621,8 @@ const s = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   groupIcon: {
     width: 56,

@@ -95,12 +95,19 @@ export function MessageActionsSheet({
 
   const hasTextContent = Boolean(message.content?.trim());
 
+  const EDIT_WINDOW_MS = 15 * 60 * 1000;
+  const messageAge = message.createdAt
+    ? Date.now() - new Date(message.createdAt).getTime()
+    : Infinity;
+  const isWithinEditWindow = messageAge >= 0 && messageAge <= EDIT_WINDOW_MS;
+
   const canEditMessage =
     message.isOwnMessage &&
     (message.type === 'TEXT' || message.type === 'DEFAULT' || !message.type) &&
     hasTextContent &&
     message.attachments.length === 0 &&
-    !message.isDeleted;
+    !message.isDeleted &&
+    isWithinEditWindow;
 
   const actions: ActionItem[] = [
     {

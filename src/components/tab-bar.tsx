@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import type { MaterialTopTabBarProps } from "@react-navigation/material-top-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/theme";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -17,8 +18,10 @@ export function TabBar({
   state,
   descriptors,
   navigation,
+  position,
   insets,
-}: BottomTabBarProps) {
+}: MaterialTopTabBarProps & { insets?: { bottom: number } }) {
+  const safeInsets = useSafeAreaInsets();
   const routeCount = state.routes.length;
   const [pillWidth, setPillWidth] = useState(0);
   const itemWidth = pillWidth / routeCount;
@@ -35,9 +38,12 @@ export function TabBar({
     }).start();
   }, [state.index, indicatorAnim]);
 
+  const activePosition = position ?? indicatorAnim;
+  const bottomMargin = Math.max(insets?.bottom ?? safeInsets.bottom, 0) + 2;
+
   return (
     <View
-      style={[styles.wrapper, { bottom: Math.max(insets.bottom, 0) + 2 }]}
+      style={[styles.wrapper, { bottom: bottomMargin }]}
       pointerEvents="box-none"
     >
       <View
@@ -52,7 +58,7 @@ export function TabBar({
                 width: itemWidth - 8,
                 transform: [
                   {
-                    translateX: indicatorAnim.interpolate({
+                    translateX: activePosition.interpolate({
                       inputRange: state.routes.map((_, i) => i),
                       outputRange: state.routes.map(
                         (_, i) => i * itemWidth + 4,

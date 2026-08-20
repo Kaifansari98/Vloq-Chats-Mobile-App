@@ -183,7 +183,7 @@ export default function ChatsScreen() {
         <View className="flex-row items-center justify-between">
           <Text className="text-[34px] font-extrabold text-white">Chats</Text>
           <Pressable
-            onPress={() => setIsCreateGroupOpen(true)}
+            onPress={() => router.push('/(app)/create-group')}
             className="flex-row items-center gap-1.5 rounded-full bg-white/10 border border-white/10 px-3.5 py-1.5 active:bg-white/20"
           >
             <Ionicons name="people" size={16} color="#ffffff" />

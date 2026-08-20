@@ -88,34 +88,11 @@ export function useEditGroupMessage(conversationUuid?: string) {
       messageUuid: string;
       content: string;
     }) => {
-      try {
-        const { data } = await api.put<SendGroupMessageResponse>(
-          `/chats/group/${conversationUuid}/messages/${messageUuid}`,
-          { content }
-        );
-        return data;
-      } catch {
-        try {
-          const { data } = await api.patch<SendGroupMessageResponse>(
-            `/chats/group/${conversationUuid}/messages/${messageUuid}`,
-            { content }
-          );
-          return data;
-        } catch {
-          try {
-            const { data } = await api.post<SendGroupMessageResponse>(
-              `/chats/group/${conversationUuid}/messages/edit`,
-              { messageUuid, content }
-            );
-            return data;
-          } catch {
-            return {
-              message: "Optimistically updated",
-              data: { uuid: messageUuid, content } as DirectMessage,
-            };
-          }
-        }
-      }
+      const { data } = await api.put<SendGroupMessageResponse>(
+        `/chats/group/${conversationUuid}/messages/${messageUuid}`,
+        { content }
+      );
+      return data;
     },
     onMutate: async ({ messageUuid, content }) => {
       await queryClient.cancelQueries({ queryKey: ["group-messages", conversationUuid] });
@@ -133,18 +110,20 @@ export function useEditGroupMessage(conversationUuid?: string) {
       }
       return { previous };
     },
-    onSuccess: (_data, { messageUuid, content }) => {
+    onSuccess: (responseData, { messageUuid, content }) => {
       queryClient.setQueryData<GroupMessagesResponse>(["group-messages", conversationUuid], (old) => {
         if (!old) return old;
         return {
           ...old,
           data: old.data.map((msg) =>
             msg.uuid === messageUuid
-              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              ? responseData.data || { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
               : msg
           ),
         };
       });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+      void queryClient.invalidateQueries({ queryKey: ["group-messages", conversationUuid] });
     },
   });
 }

@@ -1095,6 +1095,23 @@ function MessageBubble({
                 />
               ) : null}
 
+              {Boolean(message.metadata?.isForwarded) ? (
+                <View className="mb-1 flex-row items-center gap-1">
+                  <Ionicons
+                    name="arrow-redo"
+                    size={12}
+                    color={isOwn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.45)'}
+                  />
+                  <Text
+                    className={`text-[11px] italic ${
+                      isOwn ? 'text-white/60' : 'text-white/50'
+                    }`}
+                  >
+                    Forwarded
+                  </Text>
+                </View>
+              ) : null}
+
               {showSenderName ? (
                 <Text className="mb-1 text-[11px] font-semibold text-blue-400">
                   {message.senderName}
@@ -1319,6 +1336,7 @@ export default function ChatScreen() {
   // ── New feature state ──
   const [actionMessage, setActionMessage] = useState<DirectMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<DirectMessage | null>(null);
+  const [forwardTargetMessage, setForwardTargetMessage] = useState<DirectMessage | null>(null);
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
   const [isForwardPickerVisible, setIsForwardPickerVisible] = useState(false);
   const [isMediaGalleryVisible, setIsMediaGalleryVisible] = useState(false);
@@ -1617,7 +1635,10 @@ export default function ChatScreen() {
   }
 
   function handleActionForward() {
-    setIsForwardPickerVisible(true);
+    if (actionMessage) {
+      setForwardTargetMessage(actionMessage);
+      setIsForwardPickerVisible(true);
+    }
   }
 
   function handleActionPin() {
@@ -2238,12 +2259,14 @@ export default function ChatScreen() {
 
       <ForwardPicker
         visible={isForwardPickerVisible}
-        message={actionMessage}
+        message={forwardTargetMessage}
         onClose={() => {
           setIsForwardPickerVisible(false);
-          setActionMessage(null);
+          setForwardTargetMessage(null);
         }}
         onForwardComplete={() => {
+          setIsForwardPickerVisible(false);
+          setForwardTargetMessage(null);
           Alert.alert('Forwarded', 'Message forwarded successfully!');
         }}
       />

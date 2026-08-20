@@ -1,19 +1,37 @@
-import { Tabs } from 'expo-router/tabs';
-import { TabBar } from '@/components/tab-bar';
+import {
+  createMaterialTopTabNavigator,
+  type MaterialTopTabNavigationOptions,
+  type MaterialTopTabNavigationEventMap,
+  type MaterialTopTabBarProps,
+} from "@react-navigation/material-top-tabs";
+import { withLayoutContext } from "expo-router";
+import { TabBar } from "@/components/tab-bar";
+import type { ParamListBase, TabNavigationState } from "@react-navigation/native";
+
+const { Navigator } = createMaterialTopTabNavigator();
+
+export const MaterialTopTabs = withLayoutContext<
+  MaterialTopTabNavigationOptions,
+  typeof Navigator,
+  TabNavigationState<ParamListBase>,
+  MaterialTopTabNavigationEventMap
+>(Navigator);
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <TabBar {...props} />}
+    <MaterialTopTabs
+      tabBarPosition="bottom"
+      tabBar={(props: MaterialTopTabBarProps) => <TabBar {...props} />}
       screenOptions={{
-        headerShown: false,
-        animation: 'fade',
+        swipeEnabled: true,
+        animationEnabled: true,
+        lazy: true,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Chats' }} />
-      <Tabs.Screen name="users" options={{ title: 'Users' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-    </Tabs>
+      <MaterialTopTabs.Screen name="index" options={{ title: "Chats" }} />
+      <MaterialTopTabs.Screen name="users" options={{ title: "Users" }} />
+      <MaterialTopTabs.Screen name="settings" options={{ title: "Settings" }} />
+      <MaterialTopTabs.Screen name="profile" options={{ title: "Profile" }} />
+    </MaterialTopTabs>
   );
 }

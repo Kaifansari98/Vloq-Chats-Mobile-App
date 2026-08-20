@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api';
@@ -60,6 +61,15 @@ void registerNotificationCategories();
  */
 async function registerForPushNotificationsAsync(): Promise<string | null> {
   try {
+    // Expo Go on Android SDK 53+ supports local notifications only. Avoid
+    // attempting remote-token registration, which logs a native error there.
+    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+      console.info(
+        'Remote push notifications require a development or production build. Local notifications still work in Expo Go.',
+      );
+      return null;
+    }
+
     // Check existing permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
@@ -97,7 +107,18 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
       });
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+
+    if (!projectId) {
+      console.warn(
+        'Remote push notifications are not configured: add extra.eas.projectId to app.json after linking this app to an EAS project.',
+      );
+      return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     return tokenData.data;
   } catch (error) {
     // This will fail in Expo Go (SDK 53+) — that's expected.
@@ -112,9 +133,9 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
  */
 async function sendPushTokenToBackend(pushToken: string): Promise<void> {
   try {
-    await api.post('/notifications/push-token', {
+    await api.post('/users/push-tokens', {
       token: pushToken,
-      platform: Platform.OS,
+      userAgent: `${Platform.OS} ${Constants.platform?.android?.versionCode ?? ''}`.trim(),
     });
     console.log('Push token registered with backend');
   } catch (error) {
@@ -197,4 +218,3 @@ export function usePushNotifications() {
     };
   }, [isAuthenticated, token]);
 }
-

@@ -20,6 +20,10 @@ export default function AppLayout() {
         >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="chat/[id]" />
+          <Stack.Screen
+            name="create-group"
+            options={{ animation: 'slide_from_right' }}
+          />
         </Stack>
       </InAppNotificationProvider>
     </ChatSocketProvider>

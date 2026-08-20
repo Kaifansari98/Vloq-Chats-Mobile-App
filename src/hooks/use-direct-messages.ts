@@ -44,6 +44,7 @@ export type DirectMessage = {
   attachments: MessageAttachment[];
   isEdited?: boolean;
   isDeleted?: boolean;
+  metadata?: Record<string, unknown> | null;
   replyTo?: {
     uuid: string;
     senderName: string;
@@ -167,34 +168,11 @@ export function useEditDirectMessage(participantUserId?: number) {
       messageUuid: string;
       content: string;
     }) => {
-      try {
-        const { data } = await api.put<SendDirectMessageResponse>(
-          `/chats/direct/messages/${messageUuid}`,
-          { content, participantUserId }
-        );
-        return data;
-      } catch {
-        try {
-          const { data } = await api.patch<SendDirectMessageResponse>(
-            `/chats/direct/messages/${messageUuid}`,
-            { content, participantUserId }
-          );
-          return data;
-        } catch {
-          try {
-            const { data } = await api.post<SendDirectMessageResponse>(
-              `/chats/direct/messages/edit`,
-              { messageUuid, content, participantUserId }
-            );
-            return data;
-          } catch {
-            return {
-              message: "Optimistically updated",
-              data: { uuid: messageUuid, content } as DirectMessage,
-            };
-          }
-        }
-      }
+      const { data } = await api.put<SendDirectMessageResponse>(
+        `/chats/direct/messages/${messageUuid}`,
+        { content }
+      );
+      return data;
     },
     onMutate: async ({ messageUuid, content }) => {
       await queryClient.cancelQueries({ queryKey: ["direct-messages", participantUserId] });
@@ -212,18 +190,20 @@ export function useEditDirectMessage(participantUserId?: number) {
       }
       return { previous };
     },
-    onSuccess: (_data, { messageUuid, content }) => {
+    onSuccess: (responseData, { messageUuid, content }) => {
       queryClient.setQueryData<DirectMessagesResponse>(["direct-messages", participantUserId], (old) => {
         if (!old) return old;
         return {
           ...old,
           data: old.data.map((msg) =>
             msg.uuid === messageUuid
-              ? { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
+              ? responseData.data || { ...msg, content, isEdited: true, updatedAt: new Date().toISOString() }
               : msg
           ),
         };
       });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages", participantUserId] });
     },
   });
 }
