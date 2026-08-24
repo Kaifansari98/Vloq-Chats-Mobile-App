@@ -244,7 +244,7 @@ export function ForwardPicker({
         {/* Chat list */}
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
-            <Loader size={28} color="rgba(255,255,255,0.4)" />
+            <Loader size={24} color="rgba(255,255,255,0.4)" />
           </View>
         ) : (
           <FlatList

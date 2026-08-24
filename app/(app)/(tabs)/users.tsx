@@ -61,7 +61,7 @@ export default function UsersScreen() {
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center pb-20">
-          <Loader size={36} color="rgba(255,255,255,0.45)" />
+          <Loader size={24} color="rgba(255,255,255,0.45)" />
         </View>
       ) : members.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6 pb-20">
