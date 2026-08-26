@@ -15,6 +15,39 @@ import {
   type InAppNotificationData,
 } from '@/components/in-app-notification';
 import { getNotificationPreview } from '@/lib/message-preview';
+import * as Notifications from 'expo-notifications';
+
+async function scheduleNativeNotification(params: {
+  title: string;
+  body: string;
+  chatId: string;
+  isGroup: boolean;
+  memberId: number;
+  senderName: string;
+  profilePicUrl?: string | null;
+}) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: params.title,
+        body: params.body,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        categoryIdentifier: 'message',
+        data: {
+          chatId: params.chatId,
+          isGroup: params.isGroup,
+          memberId: params.memberId,
+          name: params.senderName,
+          profilePicUrl: params.profilePicUrl ?? '',
+        },
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    console.warn('[InAppNotification] Native notification trigger failed:', error);
+  }
+}
 
 type InAppNotificationContextType = {
   /** Manually show a notification (used for testing or custom triggers) */
@@ -144,16 +177,15 @@ export function InAppNotificationProvider({ children }: { children: ReactNode })
       }
 
       const preview = getMessagePreview(payload);
-      console.log('[InAppNotification] Triggering banner for:', senderName, '-', preview);
+      console.log('[InAppNotification] Triggering native system notification for:', senderName, '-', preview);
 
-      showNotification({
-        id: messageUuid,
-        senderName,
-        senderProfilePicUrl,
-        message: preview,
+      void scheduleNativeNotification({
+        title: senderName,
+        body: preview,
         chatId: conversationUuid,
         isGroup: false,
         memberId: senderId ?? 0,
+        senderName,
         profilePicUrl: senderProfilePicUrl,
       });
     }
@@ -180,7 +212,6 @@ export function InAppNotificationProvider({ children }: { children: ReactNode })
       const senderProfilePicUrl = msg?.senderProfilePicUrl ?? null;
       const conversationUuid = msg?.conversationUuid ?? payload.conversationUuid ?? '';
       const conversationName = msg?.conversationName ?? payload.conversationName ?? 'Group';
-      const messageUuid = msg?.uuid ?? Date.now().toString();
 
       // Don't show if user is already on that chat screen
       const currentPath = pathnameRef.current;
@@ -191,16 +222,15 @@ export function InAppNotificationProvider({ children }: { children: ReactNode })
       }
 
       const preview = getMessagePreview(payload);
-      console.log('[InAppNotification] Triggering group banner for:', senderName, 'in', conversationName, '-', preview);
+      console.log('[InAppNotification] Triggering native group system notification for:', senderName, 'in', conversationName, '-', preview);
 
-      showNotification({
-        id: messageUuid,
-        senderName: `${senderName} • ${conversationName}`,
-        senderProfilePicUrl,
-        message: preview,
+      void scheduleNativeNotification({
+        title: `${senderName} (${conversationName})`,
+        body: preview,
         chatId: conversationUuid,
         isGroup: true,
         memberId: senderId ?? 0,
+        senderName: conversationName,
         profilePicUrl: senderProfilePicUrl,
       });
     }
@@ -217,11 +247,6 @@ export function InAppNotificationProvider({ children }: { children: ReactNode })
   return (
     <InAppNotificationContext.Provider value={{ showNotification }}>
       {children}
-      <InAppNotificationBanner
-        notification={notification}
-        onDismiss={handleDismiss}
-        onPress={handlePress}
-      />
     </InAppNotificationContext.Provider>
   );
 }

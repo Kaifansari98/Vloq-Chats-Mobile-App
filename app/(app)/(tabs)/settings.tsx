@@ -275,7 +275,7 @@ export default function SettingsScreen() {
                 icon="person-add-outline"
                 title="Create New User"
                 subtitle="Register a new team member"
-                onPress={() => router.push('/create-user')}
+                onPress={() => router.push('/(app)/create-user')}
                 showDivider={false}
               />
             </View>

@@ -90,15 +90,6 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.inner}>
-            <View style={styles.logoBadge}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>N</Text>
-                </View>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0f172a' }}>Nexyn Chat</Text>
-              </View>
-            </View>
-
             <View style={styles.headingContainer}>
               <Text style={styles.heading}>Login to your account</Text>
               <Text style={styles.subheading}>
