@@ -24,6 +24,10 @@ export default function AppLayout() {
             name="create-group"
             options={{ animation: 'slide_from_right' }}
           />
+          <Stack.Screen
+            name="create-user"
+            options={{ animation: 'slide_from_right' }}
+          />
         </Stack>
       </InAppNotificationProvider>
     </ChatSocketProvider>

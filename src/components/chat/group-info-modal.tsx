@@ -6,50 +6,29 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  FlatList,
   Image,
   StyleSheet,
   SafeAreaView,
   Platform,
   StatusBar,
   Alert,
-  Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useGroupDetails } from '@/hooks/use-group-chats';
+import {
+  useGroupDetails,
+  useRemoveGroupMember,
+  type GroupParticipantFull,
+} from '@/hooks/use-group-chats';
 import { useAuth } from '@/hooks/use-auth';
-import { CreateGroupModal } from '@/components/chat/create-group-modal';
+import { Avatar } from '@/components/ui/Avatar';
+import { AddMemberModal } from '@/components/chat/add-member-modal';
+import { GroupMediaModal } from '@/components/chat/group-media-modal';
+import { Loader } from '@/components/ui/Loader';
 import { COLORS } from '@/constants/theme';
-
-const AVATAR_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#f97316',
-  '#10b981', '#3b82f6', '#06b6d4', '#f59e0b',
-];
-
-function getAvatarColor(id: number) {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length];
-}
-
-function getInitials(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-type GroupParticipant = {
-  id: number;
-  uuid: string;
-  name: string;
-  email: string;
-  profile_pic_url?: string | null;
-};
 
 type GroupInfoModalProps = {
   visible: boolean;
@@ -66,9 +45,12 @@ export function GroupInfoModal({
 }: GroupInfoModalProps) {
   const { user: currentUser } = useAuth();
   const { data: groupDetails, isLoading } = useGroupDetails(groupUuid);
+  const removeMemberMutation = useRemoveGroupMember(groupUuid);
+
   const [searchMember, setSearchMember] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
-  const [isAddMemberVisible, setIsAddMemberVisible] = useState(false);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<GroupParticipantFull | null>(null);
 
   const participants = useMemo(() => {
     return groupDetails?.participants ?? [];
@@ -84,10 +66,23 @@ export function GroupInfoModal({
     );
   }, [participants, searchMember]);
 
-  function handleStartDirectChat(participant: GroupParticipant) {
-    if (participant.uuid === currentUser?.uuid) return;
+  const isSelfUser = (participant: GroupParticipantFull) => {
+    if (!currentUser) return false;
+    return participant.uuid === currentUser.uuid || (currentUser as any).id === participant.id;
+  };
+
+  // Check if current user is admin of the group
+  const isCurrentUserAdmin = useMemo(() => {
+    if (!currentUser || !groupDetails) return false;
+    const me = participants.find((p) => isSelfUser(p));
+    return me?.isAdmin ?? (groupDetails.creatorId === (currentUser as any).id);
+  }, [currentUser, groupDetails, participants]);
+
+  function handleStartDirectChat(participant: GroupParticipantFull) {
+    if (isSelfUser(participant)) return;
     
     void Haptics.selectionAsync();
+    setSelectedParticipant(null);
     onClose();
     router.push({
       pathname: '/chat/[id]',
@@ -101,6 +96,16 @@ export function GroupInfoModal({
     });
   }
 
+  async function handleRemoveMember(participant: GroupParticipantFull) {
+    try {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      await removeMemberMutation.mutateAsync(participant.id);
+      setSelectedParticipant(null);
+    } catch (err) {
+      console.error('Failed to remove member:', err);
+    }
+  }
+
   function handleExitGroup() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
@@ -111,7 +116,17 @@ export function GroupInfoModal({
         {
           text: 'Exit',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            if (currentUser) {
+              try {
+                const me = participants.find((p) => isSelfUser(p));
+                if (me) {
+                  await removeMemberMutation.mutateAsync(me.id);
+                }
+              } catch (err) {
+                console.error('Failed to exit group:', err);
+              }
+            }
             onClose();
             router.replace('/(app)/(tabs)');
           },
@@ -119,6 +134,8 @@ export function GroupInfoModal({
       ]
     );
   }
+
+  const mediaCountTotal = (groupDetails?.mediaCount ?? 0) + (groupDetails?.docsCount ?? 0) + (groupDetails?.linksCount ?? 0);
 
   return (
     <>
@@ -135,129 +152,123 @@ export function GroupInfoModal({
             {/* Header bar */}
             <View style={s.headerBar}>
               <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
-                <Ionicons name="close" size={22} color="#ffffff" />
+                <Ionicons name="arrow-back" size={22} color="#ffffff" />
               </Pressable>
 
               <Text style={s.headerTitle}>Group Info</Text>
 
-              <Pressable
-                onPress={() => Alert.alert('Edit Group', 'Group settings coming soon!')}
-                hitSlop={10}
-                style={s.iconBtn}
-              >
-                <Ionicons name="ellipsis-vertical" size={20} color="#ffffff" />
-              </Pressable>
+              <View style={{ width: 36 }} />
             </View>
 
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Group Hero Section */}
-              <View style={s.heroSection}>
-                <LinearGradient
-                  colors={['#6366f1', '#4f46e5']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.groupAvatarLarge}
-                >
-                  <Ionicons name="people" size={54} color="#ffffff" />
-                </LinearGradient>
-
-                <Text style={s.groupTitleText}>{groupName}</Text>
-                <Text style={s.groupSubText}>
-                  Group · {participants.length > 0 ? `${participants.length} members` : 'Loading details...'}
-                </Text>
+            {isLoading ? (
+              <View style={s.loadingBox}>
+                <Loader size={36} color="#818cf8" />
               </View>
+            ) : (
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 50 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {/* Hero Section (WhatsApp Style) */}
+                <View style={s.heroSection}>
+                  <LinearGradient
+                    colors={['#6366f1', '#4f46e5']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={s.groupAvatarLarge}
+                  >
+                    {groupDetails?.avatarUrl ? (
+                      <Image source={{ uri: groupDetails.avatarUrl }} style={s.avatarImgLarge} />
+                    ) : (
+                      <Ionicons name="people" size={54} color="#ffffff" />
+                    )}
+                  </LinearGradient>
 
-              {/* Quick Action Buttons */}
-              <View style={s.actionRow}>
-                <Pressable
-                  onPress={() => {
-                    onClose();
-                    router.push('/(app)/create-group');
-                  }}
-                  style={s.actionCard}
-                >
-                  <View style={s.actionIconBox}>
-                    <Ionicons name="person-add-outline" size={20} color="#60a5fa" />
-                  </View>
-                  <Text style={s.actionLabel}>Add</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    onClose();
-                  }}
-                  style={s.actionCard}
-                >
-                  <View style={s.actionIconBox}>
-                    <Ionicons name="search-outline" size={20} color="#60a5fa" />
-                  </View>
-                  <Text style={s.actionLabel}>Search</Text>
-                </Pressable>
-              </View>
-
-              {/* Group Description / Info Card */}
-              <View style={s.cardContainer}>
-                <Text style={s.cardLabel}>GROUP DESCRIPTION</Text>
-                <Text style={s.descriptionText}>
-                  Official project & team discussion workspace for {groupName}.
-                </Text>
-                <Text style={s.createdInfoText}>Created by Admin</Text>
-              </View>
-
-              {/* Media, Docs & Settings Card */}
-              <View style={s.cardContainer}>
-                <Pressable
-                  onPress={() => Alert.alert('Media Gallery', 'Opening group files & media...')}
-                  style={s.rowItem}
-                >
-                  <Ionicons name="images-outline" size={20} color="#818cf8" />
-                  <Text style={s.rowText}>Media, links, and docs</Text>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
-                </Pressable>
-
-                <View style={s.divider} />
-
-                <View style={s.rowItem}>
-                  <Ionicons name="notifications-outline" size={20} color="#818cf8" />
-                  <Text style={s.rowText}>Mute notifications</Text>
-                  <Switch
-                    value={isMuted}
-                    onValueChange={setIsMuted}
-                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#6366f1' }}
-                    thumbColor="#ffffff"
-                  />
+                  <Text style={s.groupTitleText}>{groupDetails?.name ?? groupName}</Text>
+                  <Text style={s.groupSubText}>
+                    Group · {participants.length} participants
+                  </Text>
                 </View>
-              </View>
 
-              {/* Members Section Header */}
-              <View style={s.sectionHeaderRow}>
-                <Text style={s.sectionTitle}>
-                  {participants.length} MEMBERS
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    onClose();
-                    router.push('/(app)/create-group');
-                  }}
-                  hitSlop={6}
-                >
-                  <Ionicons name="person-add" size={18} color="#60a5fa" />
-                </Pressable>
-              </View>
+                {/* Quick Action Bar */}
+                <View style={s.actionRow}>
+                  <Pressable
+                    onPress={() => setIsAddMemberOpen(true)}
+                    style={s.actionCard}
+                  >
+                    <View style={s.actionIconBox}>
+                      <Ionicons name="person-add-outline" size={20} color="#10b981" />
+                    </View>
+                    <Text style={[s.actionLabel, { color: '#10b981' }]}>Add</Text>
+                  </Pressable>
 
-              {/* Search Member Input */}
-              {participants.length > 3 && (
+                  <Pressable
+                    onPress={() => setSearchMember((prev) => (prev ? '' : ' '))}
+                    style={s.actionCard}
+                  >
+                    <View style={s.actionIconBox}>
+                      <Ionicons name="search-outline" size={20} color="#60a5fa" />
+                    </View>
+                    <Text style={s.actionLabel}>Search</Text>
+                  </Pressable>
+                </View>
+
+                {/* Group Description Card */}
+                <View style={s.cardContainer}>
+                  <Text style={s.cardLabel}>DESCRIPTION</Text>
+                  <Text style={s.descriptionText}>
+                    Official discussion & workspace channel for {groupDetails?.name ?? groupName}.
+                  </Text>
+                  <Text style={s.createdInfoText}>
+                    Created on {groupDetails?.createdAt ? new Date(groupDetails.createdAt).toLocaleDateString() : 'Vloq Workspace'}
+                  </Text>
+                </View>
+
+                {/* Media, Links & Docs Card (Clean Tap Row) */}
+                <View style={s.cardContainer}>
+                  <Pressable
+                    onPress={() => setIsMediaModalOpen(true)}
+                    style={s.rowItem}
+                  >
+                    <View style={s.rowIconCircle}>
+                      <Ionicons name="images-outline" size={20} color="#818cf8" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                      <Text style={s.rowText}>Media, links, and docs</Text>
+                      <Text style={s.rowSubtext}>
+                        {mediaCountTotal > 0
+                          ? `${groupDetails?.mediaCount ?? 0} photos/videos · ${groupDetails?.docsCount ?? 0} docs · ${groupDetails?.linksCount ?? 0} links`
+                          : 'None shared yet'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+                  </Pressable>
+                </View>
+
+                {/* Members Section Header */}
+                <View style={s.sectionHeaderRow}>
+                  <Text style={s.sectionTitle}>
+                    {participants.length} PARTICIPANTS
+                  </Text>
+                  <Pressable
+                    onPress={() => setIsAddMemberOpen(true)}
+                    hitSlop={8}
+                    style={s.addSmallBtn}
+                  >
+                    <Ionicons name="person-add" size={16} color="#10b981" />
+                    <Text style={s.addSmallBtnText}>Add</Text>
+                  </Pressable>
+                </View>
+
+                {/* Search Member Input */}
                 <View style={s.searchWrap}>
                   <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
                   <TextInput
                     style={s.searchInput}
-                    placeholder="Search member..."
+                    placeholder="Search participant..."
                     placeholderTextColor="rgba(255,255,255,0.35)"
-                    value={searchMember}
+                    value={searchMember.trim()}
                     onChangeText={setSearchMember}
                     autoCorrect={false}
                   />
@@ -267,109 +278,156 @@ export function GroupInfoModal({
                     </Pressable>
                   )}
                 </View>
-              )}
 
-              {/* Add Member Row Button */}
-              <Pressable
-                onPress={() => {
-                  onClose();
-                  router.push('/(app)/create-group');
-                }}
-                style={s.addMemberRow}
-              >
-                <View style={s.addMemberIconCircle}>
-                  <Ionicons name="person-add" size={18} color="#ffffff" />
-                </View>
-                <Text style={s.addMemberText}>Add Members</Text>
-              </Pressable>
+                {/* WhatsApp Style "+ Add Members" Row */}
+                <Pressable
+                  onPress={() => setIsAddMemberOpen(true)}
+                  style={s.addMemberRow}
+                >
+                  <View style={s.addMemberIconCircle}>
+                    <Ionicons name="person-add" size={18} color="#ffffff" />
+                  </View>
+                  <Text style={s.addMemberText}>Add Members</Text>
+                </Pressable>
 
-              {/* Participant List */}
-              <View style={s.cardContainer}>
-                {filteredParticipants.map((p, idx) => {
-                  const isSelf = p.uuid === currentUser?.uuid;
-                  return (
-                    <React.Fragment key={p.id}>
-                      {idx > 0 && <View style={s.divider} />}
-                      <Pressable
-                        onPress={() => handleStartDirectChat(p)}
-                        style={s.participantRow}
-                      >
-                        {p.profile_pic_url ? (
-                          <Image
-                            source={{ uri: p.profile_pic_url }}
-                            style={s.avatarImg}
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              s.avatarCircle,
-                              { backgroundColor: getAvatarColor(p.id) },
-                            ]}
-                          >
-                            <Text style={s.avatarText}>
-                              {getInitials(p.name)}
+                {/* Participant List (WhatsApp Style) */}
+                <View style={s.cardContainer}>
+                  {filteredParticipants.map((p, idx) => {
+                    const isSelf = isSelfUser(p);
+                    return (
+                      <React.Fragment key={p.id}>
+                        {idx > 0 && <View style={s.divider} />}
+                        <Pressable
+                          onPress={() => setSelectedParticipant(p)}
+                          style={s.participantRow}
+                        >
+                          <Avatar name={p.name} url={p.profile_pic_url} size={42} />
+
+                          <View style={{ flex: 1, marginLeft: 14 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Text style={s.participantName}>{p.name}</Text>
+                              {isSelf && (
+                                <View style={s.youBadge}>
+                                  <Text style={s.youBadgeText}>You</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={s.participantEmail} numberOfLines={1}>
+                              {p.email}
                             </Text>
                           </View>
-                        )}
 
-                        <View style={{ flex: 1, marginLeft: 14 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={s.participantName}>{p.name}</Text>
-                            {isSelf && (
-                              <View style={s.youBadge}>
-                                <Text style={s.youBadgeText}>You</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={s.participantEmail} numberOfLines={1}>
-                            {p.email}
-                          </Text>
-                        </View>
+                          {p.isAdmin && (
+                            <View style={s.adminBadge}>
+                              <Text style={s.adminBadgeText}>Group Admin</Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
 
-                        {idx === 0 && (
-                          <View style={s.adminBadge}>
-                            <Text style={s.adminBadgeText}>Admin</Text>
-                          </View>
-                        )}
-                      </Pressable>
-                    </React.Fragment>
-                  );
-                })}
-              </View>
-
-              {/* Danger Zone: Exit Group */}
-              <View style={[s.cardContainer, { marginTop: 24 }]}>
-                <Pressable onPress={handleExitGroup} style={s.rowItem}>
-                  <Ionicons name="log-out-outline" size={22} color="#ef4444" />
-                  <Text style={[s.rowText, { color: '#ef4444', fontWeight: '600' }]}>
-                    Exit group
-                  </Text>
-                </Pressable>
-
-                <View style={s.divider} />
-
-                <Pressable
-                  onPress={() =>
-                    Alert.alert('Reported', 'Thank you. We will review this group.')
-                  }
-                  style={s.rowItem}
-                >
-                  <Ionicons name="thumbs-down-outline" size={22} color="#ef4444" />
-                  <Text style={[s.rowText, { color: '#ef4444' }]}>
-                    Report group
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+                {/* Danger Zone: Exit Group */}
+                <View style={[s.cardContainer, { marginTop: 20 }]}>
+                  <Pressable onPress={handleExitGroup} style={s.rowItem}>
+                    <View style={[s.rowIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                      <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                    </View>
+                    <Text style={[s.rowText, { color: '#ef4444', fontWeight: '600' }]}>
+                      Exit group
+                    </Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            )}
           </SafeAreaView>
         </View>
       </Modal>
 
-      {/* Embedded Create/Add Group Modal */}
-      <CreateGroupModal
-        visible={isAddMemberVisible}
-        onClose={() => setIsAddMemberVisible(false)}
+      {/* Embedded Add Members Modal */}
+      <AddMemberModal
+        visible={isAddMemberOpen}
+        groupUuid={groupUuid}
+        groupName={groupName}
+        existingParticipants={participants}
+        onClose={() => setIsAddMemberOpen(false)}
       />
+
+      {/* Embedded Group Media Modal */}
+      <GroupMediaModal
+        visible={isMediaModalOpen}
+        groupUuid={groupUuid}
+        groupName={groupName}
+        onClose={() => setIsMediaModalOpen(false)}
+      />
+
+      {/* Participant Options Bottom Sheet */}
+      <Modal
+        visible={selectedParticipant !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedParticipant(null)}
+      >
+        <View style={s.sheetBackdrop}>
+          <Pressable style={{ flex: 1 }} onPress={() => setSelectedParticipant(null)} />
+          <View style={s.sheetContent}>
+            <View style={s.sheetHandle} />
+
+            {selectedParticipant ? (
+              <>
+                <View style={s.sheetHeaderRow}>
+                  <Avatar
+                    name={selectedParticipant.name}
+                    url={selectedParticipant.profile_pic_url}
+                    size={48}
+                  />
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text style={s.sheetName}>{selectedParticipant.name}</Text>
+                    <Text style={s.sheetEmail}>{selectedParticipant.email}</Text>
+                  </View>
+                </View>
+
+                <View style={s.sheetActions}>
+                  {!isSelfUser(selectedParticipant) && (
+                    <Pressable
+                      onPress={() => handleStartDirectChat(selectedParticipant)}
+                      style={s.sheetBtn}
+                    >
+                      <Ionicons name="chatbubble-ellipses-outline" size={20} color="#60a5fa" />
+                      <Text style={s.sheetBtnText}>Message {selectedParticipant.name.split(' ')[0]}</Text>
+                    </Pressable>
+                  )}
+
+                  {isCurrentUserAdmin && !isSelfUser(selectedParticipant) && (
+                    <Pressable
+                      onPress={() => void handleRemoveMember(selectedParticipant)}
+                      disabled={removeMemberMutation.isPending}
+                      style={[s.sheetBtn, { backgroundColor: 'rgba(239,68,68,0.12)' }]}
+                    >
+                      {removeMemberMutation.isPending ? (
+                        <ActivityIndicator size="small" color="#ef4444" />
+                      ) : (
+                        <Ionicons name="person-remove-outline" size={20} color="#ef4444" />
+                      )}
+                      <Text style={[s.sheetBtnText, { color: '#ef4444' }]}>
+                        {removeMemberMutation.isPending ? 'Removing...' : 'Remove from group'}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  <Pressable
+                    onPress={() => setSelectedParticipant(null)}
+                    style={s.sheetCancelBtn}
+                  >
+                    <Text style={s.sheetCancelText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -402,6 +460,11 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
+  loadingBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroSection: {
     alignItems: 'center',
     paddingVertical: 24,
@@ -410,18 +473,23 @@ const s = StyleSheet.create({
   groupAvatarLarge: {
     width: 96,
     height: 96,
-    borderRadius: 32,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
+    overflow: 'hidden',
+  },
+  avatarImgLarge: {
+    width: '100%',
+    height: '100%',
   },
   groupTitleText: {
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: '800',
     color: '#ffffff',
     textAlign: 'center',
@@ -433,7 +501,8 @@ const s = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    gap: 32,
     paddingHorizontal: 20,
     marginBottom: 20,
   },
@@ -459,11 +528,11 @@ const s = StyleSheet.create({
   },
   cardContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 14,
     padding: 16,
   },
   cardLabel: {
@@ -486,25 +555,32 @@ const s = StyleSheet.create({
   rowItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 4,
+  },
+  rowIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(129, 140, 248, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowText: {
-    flex: 1,
     fontSize: 15,
+    fontWeight: '600',
     color: '#ffffff',
-    marginLeft: 14,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginVertical: 4,
+  rowSubtext: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.45)',
+    marginTop: 2,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginTop: 8,
+    marginTop: 10,
     marginBottom: 10,
   },
   sectionTitle: {
@@ -512,6 +588,16 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.4)',
     letterSpacing: 1,
+  },
+  addSmallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addSmallBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#10b981',
   },
   searchWrap: {
     flexDirection: 'row',
@@ -538,9 +624,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
   },
   addMemberIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#10b981',
     alignItems: 'center',
     justifyContent: 'center',
@@ -556,23 +642,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
   },
-  avatarImg: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
-  avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
   participantName: {
     fontSize: 15,
     fontWeight: '600',
@@ -582,6 +651,11 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.45)',
     marginTop: 2,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: 4,
   },
   youBadge: {
     backgroundColor: 'rgba(99, 102, 241, 0.25)',
@@ -605,5 +679,74 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#10b981',
+  },
+
+  // Sheet Modal Styles
+  sheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  sheetContent: {
+    backgroundColor: '#121212',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 24,
+    paddingBottom: 36,
+  },
+  sheetHandle: {
+    width: 48,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  sheetEmail: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.45)',
+    marginTop: 2,
+  },
+  sheetActions: {
+    gap: 10,
+  },
+  sheetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 14,
+  },
+  sheetBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 12,
+  },
+  sheetCancelBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  sheetCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
 });

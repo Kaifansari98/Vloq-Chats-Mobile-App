@@ -13,9 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { CreateUserModal } from '@/components/admin/create-user-modal';
 import { CustomToggle } from '@/components/ui/CustomToggle';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -200,35 +200,9 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
       >
-        {/* ────────── Section 1: Notifications & Sounds ────────── */}
-        <SectionHeader title="NOTIFICATIONS & SOUNDS" />
+        {/* ────────── Section 1: Notifications & Tester (Unimplemented) ────────── */}
+        {/* <SectionHeader title="NOTIFICATIONS & TESTER" />
         <View style={styles.card}>
-          <ToggleRow
-            icon="notifications-outline"
-            title="Message Notifications"
-            subtitle="Push alerts for new messages"
-            value={pushNotifications}
-            onValueChange={setPushNotifications}
-          />
-          <ToggleRow
-            icon="volume-medium-outline"
-            title="In-App Sound"
-            subtitle="Play sound when message arrives"
-            value={inAppSound}
-            onValueChange={setInAppSound}
-          />
-          <ToggleRow
-            icon="phone-portrait-outline"
-            title="Vibration"
-            subtitle="Vibrate on new messages"
-            value={vibration}
-            onValueChange={setVibration}
-            showDivider={false}
-          />
-        </View>
-
-        {/* Notification Tester Card — same row layout as other sections */}
-        <View style={[styles.card, { marginTop: 10 }]}>
           <Pressable
             onPress={() => void triggerTestNotification()}
           >
@@ -243,10 +217,10 @@ export default function SettingsScreen() {
               <Ionicons name="paper-plane-outline" size={18} color="rgba(255,255,255,0.4)" />
             </View>
           </Pressable>
-        </View>
+        </View> */}
 
-        {/* ────────── Section 2: Privacy & Security ────────── */}
-        <SectionHeader title="PRIVACY & SECURITY" />
+        {/* ────────── Section 2: Privacy & Security (Unimplemented) ────────── */}
+        {/* <SectionHeader title="PRIVACY & SECURITY" />
         <View style={styles.card}>
           <ToggleRow
             icon="checkmark-done-outline"
@@ -254,12 +228,6 @@ export default function SettingsScreen() {
             subtitle="Show when you've read messages"
             value={readReceipts}
             onValueChange={setReadReceipts}
-          />
-          <TappableRow
-            icon="ban-outline"
-            title="Blocked Users"
-            subtitle="Manage blocked contacts"
-            onPress={() => Alert.alert('Blocked Users', 'Coming soon!')}
           />
           <ToggleRow
             icon="finger-print-outline"
@@ -269,10 +237,10 @@ export default function SettingsScreen() {
             onValueChange={setAppLock}
             showDivider={false}
           />
-        </View>
+        </View> */}
 
-        {/* ────────── Section 3: Chats & Storage ────────── */}
-        <SectionHeader title="CHATS & STORAGE" />
+        {/* ────────── Section 3: Chats & Storage (Unimplemented) ────────── */}
+        {/* <SectionHeader title="CHATS & STORAGE" />
         <View style={styles.card}>
           <ToggleRow
             icon="wifi-outline"
@@ -292,26 +260,13 @@ export default function SettingsScreen() {
             icon="trash-outline"
             title="Clear Cache"
             subtitle="Free up storage space"
-            onPress={() =>
-              Alert.alert(
-                'Clear Cache',
-                'Are you sure you want to clear cached data? This will free up storage space.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Clear',
-                    style: 'destructive',
-                    onPress: () => Alert.alert('Done', 'Cache cleared successfully!'),
-                  },
-                ]
-              )
-            }
+            onPress={() => {}}
             destructive
             showDivider={false}
           />
-        </View>
+        </View> */}
 
-        {/* ────────── Section 4: Admin Tools (Admin Only) ────────── */}
+        {/* ────────── Section 4: Admin Tools (Admin Only - Real Working Setup) ────────── */}
         {isAdmin ? (
           <>
             <SectionHeader title="ADMIN TOOLS" />
@@ -320,7 +275,7 @@ export default function SettingsScreen() {
                 icon="person-add-outline"
                 title="Create New User"
                 subtitle="Register a new team member"
-                onPress={() => setIsCreateUserOpen(true)}
+                onPress={() => router.push('/create-user')}
                 showDivider={false}
               />
             </View>
@@ -330,18 +285,6 @@ export default function SettingsScreen() {
         {/* ────────── Section 5: Help & About ────────── */}
         <SectionHeader title="HELP & ABOUT" />
         <View style={styles.card}>
-          <TappableRow
-            icon="help-circle-outline"
-            title="Help & Support"
-            subtitle="FAQs and contact support"
-            onPress={() => Alert.alert('Help & Support', 'Coming soon!')}
-          />
-          <TappableRow
-            icon="document-text-outline"
-            title="Terms & Privacy Policy"
-            subtitle="Read our terms of service"
-            onPress={() => Alert.alert('Terms & Privacy Policy', 'Coming soon!')}
-          />
           <TappableRow
             icon="information-circle-outline"
             title="App Version"
@@ -354,12 +297,6 @@ export default function SettingsScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
-
-      {/* Create User Modal */}
-      <CreateUserModal
-        visible={isCreateUserOpen}
-        onClose={() => setIsCreateUserOpen(false)}
-      />
     </View>
   );
 }

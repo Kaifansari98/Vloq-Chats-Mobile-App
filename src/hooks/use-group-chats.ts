@@ -2,12 +2,49 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { GroupChat, Chat } from "@/hooks/use-direct-chats";
 
-type CreateGroupResponse = {
-  data: { uuid: string; name: string };
+export type GroupParticipantFull = {
+  id: number;
+  uuid: string;
+  name: string;
+  email: string;
+  profile_pic_url?: string | null;
+  userTypeCode?: string;
+  role?: string;
+  isAdmin?: boolean;
+};
+
+export type FullGroupDetails = {
+  id: number;
+  uuid: string;
+  type: "GROUP";
+  name: string;
+  avatarUrl?: string | null;
+  creatorId: number;
+  createdAt: string;
+  updatedAt: string;
+  mediaCount: number;
+  docsCount: number;
+  linksCount: number;
+  participants: GroupParticipantFull[];
+};
+
+export type GroupMediaItem = {
+  id: string;
+  type: "IMAGE" | "VIDEO" | "FILE" | "LINK";
+  url: string;
+  name: string;
+  sizeBytes: number;
+  mimeType: string;
+  createdAt: string;
+  senderName: string;
 };
 
 type GroupDetailsResponse = {
-  data: GroupChat;
+  data: FullGroupDetails;
+};
+
+type GroupMediaResponse = {
+  data: GroupMediaItem[];
 };
 
 export function useCreateGroupChat() {
@@ -20,7 +57,7 @@ export function useCreateGroupChat() {
       name: string;
       memberIds: number[];
     }) => {
-      const { data } = await api.post<CreateGroupResponse>("/chats/group", {
+      const { data } = await api.post<{ data: { uuid: string; name: string } }>("/chats/group", {
         name,
         memberIds,
       });
@@ -36,30 +73,68 @@ export function useCreateGroupChat() {
 export function useGroupDetails(conversationUuid?: string) {
   const queryClient = useQueryClient();
 
-  return useQuery<GroupChat | null>({
+  return useQuery<FullGroupDetails | null>({
     queryKey: ["group-details", conversationUuid],
     enabled: typeof conversationUuid === "string" && conversationUuid.length > 0,
     queryFn: async () => {
-      // 1. Check if we already have the group chat in direct-chats query cache
-      const cachedChats = queryClient.getQueryData<{ data: Chat[] }>(["direct-chats", 1, "", "ALL"]) ||
-        queryClient.getQueryData<{ data: Chat[] }>(["direct-chats", 1, "", "GROUPS"]);
-
-      const foundInCache = cachedChats?.data?.find(
-        (c): c is GroupChat => c.type === "GROUP" && c.uuid === conversationUuid
-      );
-
-      if (foundInCache) {
-        return foundInCache;
-      }
-
-      // 2. Otherwise fetch from API endpoint
       try {
         const { data } = await api.get<GroupDetailsResponse>(`/chats/group/${conversationUuid}`);
         return data.data;
       } catch (err) {
-        console.warn("Failed to fetch group details via endpoint, trying fallback cache search", err);
-        return foundInCache || null;
+        console.warn("Failed to fetch group details via endpoint", err);
+        return null;
       }
+    },
+  });
+}
+
+export function useGroupMedia(
+  conversationUuid?: string,
+  type: "media" | "docs" | "links" | "all" = "all"
+) {
+  return useQuery<GroupMediaItem[]>({
+    queryKey: ["group-media", conversationUuid, type],
+    enabled: typeof conversationUuid === "string" && conversationUuid.length > 0,
+    queryFn: async () => {
+      const { data } = await api.get<GroupMediaResponse>(
+        `/chats/group/${conversationUuid}/media?type=${type}`
+      );
+      return data.data ?? [];
+    },
+  });
+}
+
+export function useAddGroupMembers(conversationUuid?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (memberIds: number[]) => {
+      const { data } = await api.post<GroupDetailsResponse>(
+        `/chats/group/${conversationUuid}/members`,
+        { memberIds }
+      );
+      return data.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["group-details", conversationUuid] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+    },
+  });
+}
+
+export function useRemoveGroupMember(conversationUuid?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (memberId: number) => {
+      const { data } = await api.delete(
+        `/chats/group/${conversationUuid}/members/${memberId}`
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["group-details", conversationUuid] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
     },
   });
 }

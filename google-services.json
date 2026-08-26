@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "477818527069",
+    "project_id": "vloq-chats",
+    "storage_bucket": "vloq-chats.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:477818527069:android:82488ce85db8ca63b61cb4",
+        "android_client_info": {
+          "package_name": "com.vloq.chats"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDGpPMeCS4rHdcbtY5gc6FjrYBGGXHXXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -58,6 +58,7 @@ import {
   useEditGroupMessage,
 } from '@/hooks/use-group-messages';
 import type { DirectMessage, MessageAttachment } from '@/hooks/use-direct-messages';
+import { resolveMediaUrl } from '@/lib/api';
 import { MessageActionsSheet } from '@/components/chat/message-actions';
 import { ForwardPicker } from '@/components/chat/forward-picker';
 import { PinnedBanner } from '@/components/chat/pinned-banner';
@@ -151,31 +152,32 @@ const pdfBase64Cache = new Map<string, string>();
 const pdfBase64Promises = new Map<string, Promise<string | null>>();
 
 function getPdfBase64(url: string): Promise<string | null> {
-  const cached = pdfBase64Cache.get(url);
+  const resolvedUrl = resolveMediaUrl(url);
+  const cached = pdfBase64Cache.get(resolvedUrl);
   if (cached) return Promise.resolve(cached);
 
-  const pending = pdfBase64Promises.get(url);
+  const pending = pdfBase64Promises.get(resolvedUrl);
   if (pending) return pending;
 
   const promise = (async () => {
     try {
-      const localUri = `${FileSystem.cacheDirectory}pdf-preview-${encodeURIComponent(url).replace(/[^a-zA-Z0-9]/g, '')}.pdf`;
+      const localUri = `${FileSystem.cacheDirectory}pdf-preview-${encodeURIComponent(resolvedUrl).replace(/[^a-zA-Z0-9]/g, '')}.pdf`;
       const info = await FileSystem.getInfoAsync(localUri);
       if (!info.exists) {
-        await FileSystem.downloadAsync(url, localUri);
+        await FileSystem.downloadAsync(resolvedUrl, localUri);
       }
       const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' });
-      pdfBase64Cache.set(url, base64);
+      pdfBase64Cache.set(resolvedUrl, base64);
       return base64;
     } catch (error) {
       console.error('Failed to load PDF for preview', error);
       return null;
     } finally {
-      pdfBase64Promises.delete(url);
+      pdfBase64Promises.delete(resolvedUrl);
     }
   })();
 
-  pdfBase64Promises.set(url, promise);
+  pdfBase64Promises.set(resolvedUrl, promise);
   return promise;
 }
 
@@ -309,19 +311,7 @@ function TranscriptionSection({ attachment }: { attachment: MessageAttachment })
   }
 
   if (status === 'FAILED' || requestTranscription.isError) {
-    return (
-      <View className="mt-2 flex-row items-center justify-between border-t border-white/10 pt-1.5">
-        <Text className="text-[11px] text-red-400">Transcription failed</Text>
-        <Pressable
-          onPress={() => requestTranscription.mutate(attachment.uuid)}
-          className="flex-row items-center gap-1 rounded bg-white/10 px-1.5 py-0.5"
-          hitSlop={4}
-        >
-          <Ionicons name="refresh" size={10} color="#ffffff" />
-          <Text className="text-[10px] font-medium text-white">Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return null;
   }
 
   return null;
@@ -345,7 +335,8 @@ function AudioMessageBubble({
   isPeerOnline?: boolean;
 }) {
   const { width: screenWidth } = useWindowDimensions();
-  const player = useAudioPlayer(attachment.url);
+  const audioUrl = useMemo(() => resolveMediaUrl(attachment.url), [attachment.url]);
+  const player = useAudioPlayer(audioUrl);
   const status = useAudioPlayerStatus(player);
   const [waveformWidth, setWaveformWidth] = useState(0);
   const scrubberX = useRef(new Animated.Value(0)).current;
@@ -537,7 +528,7 @@ function ImageGrid({
     return (
       <Pressable onPress={() => onPressImage(0)}>
         <Image
-          source={{ uri: attachments[0].url }}
+          source={{ uri: resolveMediaUrl(attachments[0].url) }}
           className="mb-1.5 h-48 w-56 rounded-lg"
           resizeMode="cover"
         />
@@ -558,7 +549,7 @@ function ImageGrid({
             style={{ flex: 1, height: '100%' }}
           >
             <Image
-              source={{ uri: attachment.url }}
+              source={{ uri: resolveMediaUrl(attachment.url) }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
@@ -577,7 +568,7 @@ function ImageGrid({
       >
         <Pressable onPress={() => onPressImage(0)} style={{ width: IMAGE_GRID_SIZE * 0.58, height: '100%' }}>
           <Image
-            source={{ uri: first.url }}
+            source={{ uri: resolveMediaUrl(first.url) }}
             style={{ width: '100%', height: '100%' }}
             resizeMode="cover"
           />
@@ -585,14 +576,14 @@ function ImageGrid({
         <View style={{ flex: 1, gap: IMAGE_GRID_GAP }}>
           <Pressable onPress={() => onPressImage(1)} style={{ flex: 1, width: '100%' }}>
             <Image
-              source={{ uri: second.url }}
+              source={{ uri: resolveMediaUrl(second.url) }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
           </Pressable>
           <Pressable onPress={() => onPressImage(2)} style={{ flex: 1, width: '100%' }}>
             <Image
-              source={{ uri: third.url }}
+              source={{ uri: resolveMediaUrl(third.url) }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
@@ -618,7 +609,7 @@ function ImageGrid({
             style={{ flex: 1, height: '100%' }}
           >
             <Image
-              source={{ uri: attachment.url }}
+              source={{ uri: resolveMediaUrl(attachment.url) }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
@@ -635,7 +626,7 @@ function ImageGrid({
               style={{ flex: 1, height: '100%', position: 'relative' }}
             >
               <Image
-                source={{ uri: attachment.url }}
+                source={{ uri: resolveMediaUrl(attachment.url) }}
                 style={{ width: '100%', height: '100%' }}
                 resizeMode="cover"
               />
@@ -747,7 +738,7 @@ function ImageViewerModal({
             <View className="flex-1 items-center justify-center">
               <View style={{ width: screenWidth, height: screenHeight * 0.85 }}>
                 <Image
-                  source={{ uri: attachments[0].url }}
+                  source={{ uri: resolveMediaUrl(attachments[0].url) }}
                   style={{ width: '100%', height: '100%' }}
                   resizeMode="contain"
                 />
@@ -768,7 +759,7 @@ function ImageViewerModal({
               renderItem={({ item }) => (
                 <View style={{ width: screenWidth, height: itemHeight, marginBottom: 4 }}>
                   <Image
-                    source={{ uri: item.url }}
+                    source={{ uri: resolveMediaUrl(item.url) }}
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                   />
@@ -947,14 +938,20 @@ function MessageBubble({
     const t = resolveAttachmentType(attachment);
     return t === 'voice' || t === 'audio';
   });
-  const fileAttachment = message.attachments.find((attachment) => {
+  const fileAttachments = message.attachments.filter((attachment) => {
     const t = resolveAttachmentType(attachment);
     return t !== 'image' && t !== 'gif' && t !== 'voice' && t !== 'audio';
   });
   const isAudioOnlyMessage =
     Boolean(audioAttachment) &&
     imageAttachments.length === 0 &&
-    !fileAttachment &&
+    fileAttachments.length === 0 &&
+    !message.content &&
+    !message.replyTo;
+  const isFileOnlyMessage =
+    fileAttachments.length > 0 &&
+    imageAttachments.length === 0 &&
+    !audioAttachment &&
     !message.content &&
     !message.replyTo;
 
@@ -1076,13 +1073,13 @@ function MessageBubble({
           <Pressable onLongPress={() => onMessageAction(message)}>
             <View
               className={
-                isAudioOnlyMessage
+                isAudioOnlyMessage || isFileOnlyMessage
                   ? 'overflow-visible'
                   : `overflow-hidden rounded-2xl px-3 py-2 ${isOwn ? 'rounded-tr-sm bg-bubbleSent' : 'rounded-tl-sm bg-bubbleReceived'
                   }`
               }
               style={
-                message.replyTo && !isAudioOnlyMessage
+                message.replyTo && !isAudioOnlyMessage && !isFileOnlyMessage
                   ? { minWidth: Math.min(screenWidth * 0.56, 280) }
                   : undefined
               }
@@ -1187,10 +1184,10 @@ function MessageBubble({
                       style={{ backgroundColor: '#1f1f1f' }}
                     >
                       {replyPreview.thumbnailKind === 'pdf' ? (
-                        <PdfPreview uri={replyPreview.thumbnailUri} />
+                        <PdfPreview uri={resolveMediaUrl(replyPreview.thumbnailUri)} />
                       ) : (
                         <ExpoImage
-                          source={replyPreview.thumbnailUri}
+                          source={resolveMediaUrl(replyPreview.thumbnailUri)}
                           style={{ width: '100%', height: '100%' }}
                           contentFit="cover"
                         />
@@ -1207,45 +1204,93 @@ function MessageBubble({
                 />
               ) : null}
 
-              {fileAttachment ? (
-                <Pressable
-                  onPress={() => void Linking.openURL(fileAttachment.url)}
-                  className={`mb-1.5 w-[230px] overflow-hidden rounded-xl ${isOwn ? 'bg-white/10' : 'bg-white/8'
-                    }`}
-                >
-                  {isPdfMimeType(fileAttachment.mimeType) ? (
-                    <View className="h-[150px] w-full bg-white">
-                      <PdfPreview uri={fileAttachment.url} />
-                      <LinearGradient
-                        colors={['transparent', isOwn ? '#333333' : '#242625']}
-                        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 36 }}
-                        pointerEvents="none"
-                      />
-                    </View>
-                  ) : null}
-                  <View className="flex-row items-center gap-3 p-2.5">
-                    <View
-                      className="h-11 w-11 items-center justify-center rounded-lg"
-                      style={{
-                        backgroundColor: getFileColor(getFileExtension(fileAttachment.name)),
-                      }}
-                    >
-                      <Ionicons name="document-text" size={22} color="#ffffff" />
-                    </View>
-                    <View className="min-w-0 flex-1">
-                      <Text
-                        numberOfLines={2}
-                        className={`text-[14px] font-medium ${isOwn ? 'text-white' : 'text-white/95'}`}
+              {fileAttachments.length > 0 ? (
+                <View className="my-1 flex-col gap-3.5">
+                  {fileAttachments.map((fileAtt, index) => {
+                    const isPdf = isPdfMimeType(fileAtt.mimeType);
+                    const ext = getFileExtension(fileAtt.name);
+                    return (
+                      <Pressable
+                        key={fileAtt.uuid || `${fileAtt.name}-${index}`}
+                        onPress={() => void Linking.openURL(resolveMediaUrl(fileAtt.url))}
+                        className={`w-[270px] overflow-hidden rounded-2xl ${
+                          isOwn
+                            ? 'rounded-tr-sm bg-[#d9fdd3] dark:bg-[#005c4b]'
+                            : 'rounded-tl-sm bg-white dark:bg-[#202c33]'
+                        } border border-slate-200/80 dark:border-white/10 shadow-xs`}
                       >
-                        {fileAttachment.name}
-                      </Text>
-                      <Text className="mt-0.5 text-[11px] uppercase text-white/50">
-                        {formatFileSize(fileAttachment.sizeBytes)} ·{' '}
-                        {getFileExtension(fileAttachment.name)}
-                      </Text>
-                    </View>
-                  </View>
-                </Pressable>
+                        {isPdf ? (
+                          <View className="w-full">
+                            <View className="h-[155px] w-full bg-white overflow-hidden rounded-t-2xl">
+                              <PdfPreview uri={resolveMediaUrl(fileAtt.url)} />
+                            </View>
+                            <View className="px-3 pt-2.5 pb-2">
+                              <Text
+                                numberOfLines={2}
+                                className="text-[14.5px] font-semibold leading-snug text-slate-900 dark:text-white"
+                              >
+                                {fileAtt.name}
+                              </Text>
+                              <View className="mt-1.5 flex-row items-center justify-between">
+                                <Text className="text-[12px] font-normal text-slate-600 dark:text-white/70">
+                                  {formatFileSize(fileAtt.sizeBytes)} • {ext}
+                                </Text>
+                                <View className="flex-row items-center gap-1">
+                                  <Text className="text-[10px] text-slate-600 dark:text-white/70">
+                                    {formatBubbleTime(message.createdAt)}
+                                  </Text>
+                                  {isOwn ? (
+                                    <Ionicons
+                                      name={message.status === 'read' ? 'checkmark-done' : (message.status === 'sent' && isPeerOnline) ? 'checkmark-done' : 'checkmark'}
+                                      size={14}
+                                      color={message.status === 'read' ? '#34b7f1' : 'rgba(255,255,255,0.6)'}
+                                    />
+                                  ) : null}
+                                </View>
+                              </View>
+                            </View>
+                          </View>
+                        ) : (
+                          <View className="p-3">
+                            <View className="flex-row items-center gap-3">
+                              <View
+                                className="h-11 w-11 items-center justify-center rounded-lg"
+                                style={{
+                                  backgroundColor: getFileColor(ext),
+                                }}
+                              >
+                                <Ionicons name="document-text" size={22} color="#ffffff" />
+                              </View>
+                              <View className="min-w-0 flex-1">
+                                <Text
+                                  numberOfLines={2}
+                                  className="text-[14.5px] font-semibold leading-snug text-slate-900 dark:text-white"
+                                >
+                                  {fileAtt.name}
+                                </Text>
+                                <Text className="mt-0.5 text-[12px] font-normal text-slate-600 dark:text-white/70">
+                                  {formatFileSize(fileAtt.sizeBytes)} • {ext}
+                                </Text>
+                              </View>
+                            </View>
+                            <View className="mt-2 flex-row items-center justify-end gap-1">
+                              <Text className="text-[10px] text-slate-600 dark:text-white/70">
+                                {formatBubbleTime(message.createdAt)}
+                              </Text>
+                              {isOwn ? (
+                                <Ionicons
+                                  name={message.status === 'read' ? 'checkmark-done' : (message.status === 'sent' && isPeerOnline) ? 'checkmark-done' : 'checkmark'}
+                                  size={14}
+                                  color={message.status === 'read' ? '#34b7f1' : 'rgba(255,255,255,0.6)'}
+                                />
+                              ) : null}
+                            </View>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
               ) : null}
 
               {audioAttachment ? (
@@ -1266,7 +1311,7 @@ function MessageBubble({
                 </Text>
               ) : null}
 
-              {!isAudioOnlyMessage ? (
+              {!isAudioOnlyMessage && !isFileOnlyMessage ? (
                 <View className="mt-1 flex-row items-center justify-end gap-1">
                   {message.isEdited ? (
                     <Text className={`text-[10px] italic ${isOwn ? 'text-white/60' : 'text-white/40'}`}>
@@ -1518,85 +1563,113 @@ export default function ChatScreen() {
   }, []);
 
   async function pickImage(source: 'library' | 'camera') {
-    const permission =
-      source === 'library'
-        ? await ImagePicker.requestMediaLibraryPermissionsAsync()
-        : await ImagePicker.requestCameraPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow access to continue.');
-      return;
+    if (source === 'library') {
+      const statusResult = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (!statusResult.granted) {
+        const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!req.granted) {
+          Alert.alert('Permission needed', 'Please allow photo access to continue.');
+          return;
+        }
+      }
+    } else {
+      const statusResult = await ImagePicker.getCameraPermissionsAsync();
+      if (!statusResult.granted) {
+        const req = await ImagePicker.requestCameraPermissionsAsync();
+        if (!req.granted) {
+          Alert.alert('Permission needed', 'Please allow camera access to continue.');
+          return;
+        }
+      }
     }
 
     const result =
       source === 'library'
         ? await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images', 'videos'],
-          quality: 1.0,
-        })
+            mediaTypes: ['images', 'videos'],
+            allowsMultipleSelection: true,
+            selectionLimit: 10,
+            quality: 1.0,
+          })
         : await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images', 'videos'],
-          quality: 1.0,
-        });
+            mediaTypes: ['images', 'videos'],
+            quality: 1.0,
+          });
 
-    if (result.canceled || !result.assets?.[0]) return;
+    if (result.canceled || !result.assets?.length) return;
 
-    const asset = result.assets[0];
-    const isVideo = asset.type === 'video' || asset.mimeType?.startsWith('video/');
-
-    setPreviewAttachment({
-      uri: asset.uri,
-      name: asset.fileName ?? (isVideo ? 'video.mp4' : 'photo.jpg'),
-      type: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
-      kind: isVideo ? 'video' : 'image',
-      width: asset.width,
-      height: asset.height,
-      durationSeconds: asset.duration ? Math.round(asset.duration / 1000) : undefined,
-      sizeBytes: asset.fileSize,
-      quality: 'STANDARD',
+    const attachments: PickedAttachment[] = result.assets.map((asset) => {
+      const isVideo = asset.type === 'video' || asset.mimeType?.startsWith('video/');
+      return {
+        uri: asset.uri,
+        name: asset.fileName ?? (isVideo ? 'video.mp4' : 'photo.jpg'),
+        type: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+        kind: isVideo ? 'video' : 'image',
+        width: asset.width,
+        height: asset.height,
+        durationSeconds: asset.duration ? Math.round(asset.duration / 1000) : undefined,
+        sizeBytes: asset.fileSize,
+        quality: 'STANDARD',
+      };
     });
+
+    if (attachments.length === 1) {
+      setPreviewAttachment(attachments[0]);
+    } else {
+      handleSendMultipleAttachments(attachments, '');
+    }
   }
 
-  function handlePreviewSend(att: PickedAttachment, caption: string) {
-    setPreviewAttachment(null);
+  function handleSendMultipleAttachments(files: PickedAttachment[], caption: string) {
     stopTyping();
-
     const uploadMutation = isGroup ? uploadGroup : uploadDirect;
     uploadMutation.mutate(
       {
         content: caption,
-        files: [att],
+        files,
         replyToMessageUuid: replyTo?.uuid,
       },
       {
         onSuccess: () => {
           setContent('');
           setPickedAttachment(null);
+          setPreviewAttachment(null);
           setReplyTo(null);
           scrollToBottom(true);
         },
         onError: (error) => {
           console.error('Failed to send media', error);
-          Alert.alert('Upload failed', 'Could not upload media. Please try again.');
+          Alert.alert('Upload failed', 'Could not upload files. Please try again.');
         },
       }
     );
+  }
+
+  function handlePreviewSend(att: PickedAttachment, caption: string) {
+    setPreviewAttachment(null);
+    handleSendMultipleAttachments([att], caption);
   }
 
   async function pickDocument() {
     if (isPickingDocumentRef.current) return;
     isPickingDocumentRef.current = true;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ multiple: false });
-      if (result.canceled || !result.assets?.[0]) return;
+      const result = await DocumentPicker.getDocumentAsync({ multiple: true });
+      if (result.canceled || !result.assets?.length) return;
 
-      const asset = result.assets[0];
-      setPickedAttachment({
+      const docs: PickedAttachment[] = result.assets.map((asset) => ({
         uri: asset.uri,
         name: asset.name,
         type: asset.mimeType ?? 'application/octet-stream',
         kind: 'file',
-      });
+        sizeBytes: asset.size,
+      }));
+
+      if (docs.length === 1) {
+        setPickedAttachment(docs[0]);
+      } else {
+        handleSendMultipleAttachments(docs, '');
+      }
     } finally {
       isPickingDocumentRef.current = false;
     }

@@ -3,6 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import type { MessageAttachment } from '@/hooks/use-direct-messages';
+import { resolveMediaUrl } from '@/lib/api';
 
 function formatDuration(seconds?: number | null): string {
   if (!seconds || seconds <= 0) return '0:00';
@@ -28,6 +29,7 @@ export function MediaGridItem({
 }) {
   const isVideo = attachment.attachmentType === 'VIDEO' || attachment.mimeType?.startsWith('video/');
   const isHD = attachment.quality === 'HD';
+  const mediaUrl = resolveMediaUrl(attachment.thumbnailUrl || attachment.url);
 
   return (
     <Pressable
@@ -37,7 +39,7 @@ export function MediaGridItem({
       className="relative overflow-hidden bg-white/5"
     >
       <ExpoImage
-        source={attachment.thumbnailUrl || attachment.url}
+        source={mediaUrl}
         style={{ width: '100%', height: '100%' }}
         contentFit="cover"
         transition={150}

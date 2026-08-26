@@ -3,14 +3,11 @@ import {
   View,
   Text,
   Pressable,
-  Alert,
   StatusBar,
   ScrollView,
   Modal,
   TextInput,
   ActivityIndicator,
-  ActionSheetIOS,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +18,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLogout } from '@/hooks/use-logout';
 import { Loader } from '@/components/ui/Loader';
 import { useUploadProfilePic, useUpdateProfile, useFetchUserProfile } from '@/hooks/use-profile';
-import { CreateUserModal } from '@/components/admin/create-user-modal';
 
 const AVATAR_SIZE = 110;
 
@@ -33,50 +29,35 @@ type SettingsRowData = {
   subtitle: string;
   iconColor: string;
   iconBg: string;
+  action: 'edit_name' | 'edit_photo' | 'logout';
+  isDestructive?: boolean;
 };
 
 const SETTINGS_ITEMS: SettingsRowData[] = [
   {
     icon: 'person-outline',
-    title: 'Account',
-    subtitle: 'Name, Role, Organization',
+    title: 'Edit Display Name',
+    subtitle: 'Update your full name',
     iconColor: '#ffffff',
     iconBg: 'rgba(255, 255, 255, 0.1)',
+    action: 'edit_name',
   },
   {
-    icon: 'business-outline',
-    title: 'Organization',
-    subtitle: 'Workspace details & team',
+    icon: 'camera-outline',
+    title: 'Change Profile Photo',
+    subtitle: 'Choose from camera or gallery',
     iconColor: '#ffffff',
     iconBg: 'rgba(255, 255, 255, 0.1)',
+    action: 'edit_photo',
   },
   {
-    icon: 'lock-closed-outline',
-    title: 'Privacy & Security',
-    subtitle: 'Passkeys, Active Sessions, Security',
-    iconColor: '#ffffff',
-    iconBg: 'rgba(255, 255, 255, 0.1)',
-  },
-  {
-    icon: 'notifications-outline',
-    title: 'Notifications',
-    subtitle: 'Sounds, Badges, Chat Alerts',
-    iconColor: '#ffffff',
-    iconBg: 'rgba(255, 255, 255, 0.1)',
-  },
-  {
-    icon: 'pie-chart-outline',
-    title: 'Data and Storage',
-    subtitle: 'Media download & cache settings',
-    iconColor: '#ffffff',
-    iconBg: 'rgba(255, 255, 255, 0.1)',
-  },
-  {
-    icon: 'globe-outline',
-    title: 'Language',
-    subtitle: 'English (US)',
-    iconColor: '#ffffff',
-    iconBg: 'rgba(255, 255, 255, 0.1)',
+    icon: 'log-out-outline',
+    title: 'Log Out',
+    subtitle: 'Sign out of your account',
+    iconColor: '#f87171',
+    iconBg: 'rgba(239, 68, 68, 0.15)',
+    action: 'logout',
+    isDestructive: true,
   },
 ];
 
@@ -102,11 +83,19 @@ function SettingsRow({
       </View>
       <View className={`flex-1 ml-4 py-3.5 ${showDivider ? 'border-b border-white/5' : ''}`}>
         <View className="flex-1">
-          <Text className="text-[16px] font-semibold text-white">{item.title}</Text>
-          <Text className="text-[13px] text-white/40 mt-1">{item.subtitle}</Text>
+          <Text className={`text-[16px] font-semibold ${item.isDestructive ? 'text-red-400' : 'text-white'}`}>
+            {item.title}
+          </Text>
+          <Text className={`text-[13px] ${item.isDestructive ? 'text-red-400/50' : 'text-white/40'} mt-1`}>
+            {item.subtitle}
+          </Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.25)" />
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={item.isDestructive ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.25)'}
+      />
     </Pressable>
   );
 }
@@ -121,6 +110,21 @@ export default function ProfileScreen() {
 
   const [isEditNameModalOpen, setIsEditNameModalOpen] = useState(false);
   const [editNameText, setEditNameText] = useState('');
+  const [isPhotoSheetOpen, setIsPhotoSheetOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [customAlertInfo, setCustomAlertInfo] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  function showCustomAlert(title: string, message: string) {
+    setCustomAlertInfo({ visible: true, title, message });
+  }
 
   const user = fetchedUser || authUser;
   const userName = user?.name ?? 'User';
@@ -128,7 +132,6 @@ export default function ProfileScreen() {
   const profilePic = user?.profile_pic_url ?? null;
   const orgName = user?.organizationName ?? 'Vloq Workspace';
   const roleCode = user?.userTypeCode ?? 'MEMBER';
-  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
 
   const isAdmin =
     user?.userTypeCode === 'ADMIN' ||
@@ -138,35 +141,24 @@ export default function ProfileScreen() {
 
   function handleLogout() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Log out of Vloq Chats?',
-      "You'll be signed out of your account and redirected to the login page.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log out',
-          style: 'destructive',
-          onPress: () => logoutMutation.mutate(),
-        },
-      ],
-    );
+    setIsLogoutModalOpen(true);
   }
 
   async function processSelectedImage(uri: string, filename?: string) {
     try {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await uploadPicMutation.mutateAsync({ uri, name: filename });
-      Alert.alert('Success', 'Profile picture updated successfully!');
+      showCustomAlert('Success', 'Profile picture updated successfully!');
     } catch (err) {
       console.error('Failed to upload profile picture:', err);
-      Alert.alert('Upload Error', 'Could not update profile picture. Please try again.');
+      showCustomAlert('Upload Error', 'Could not update profile picture. Please try again.');
     }
   }
 
   async function pickImageFromCamera() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Camera access is required to take a profile picture.');
+      showCustomAlert('Permission Needed', 'Camera access is required to take a profile picture.');
       return;
     }
 
@@ -185,7 +177,7 @@ export default function ProfileScreen() {
   async function pickImageFromGallery() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Photo library access is required to pick a profile picture.');
+      showCustomAlert('Permission Needed', 'Photo library access is required to pick a profile picture.');
       return;
     }
 
@@ -203,25 +195,7 @@ export default function ProfileScreen() {
 
   function handleEditPhoto() {
     void Haptics.selectionAsync();
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) void pickImageFromCamera();
-          else if (buttonIndex === 2) void pickImageFromGallery();
-        }
-      );
-    } else {
-      Alert.alert('Change Profile Photo', 'Choose an option to update your avatar', [
-        { text: 'Take Photo', onPress: () => void pickImageFromCamera() },
-        { text: 'Choose from Gallery', onPress: () => void pickImageFromGallery() },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
+    setIsPhotoSheetOpen(true);
   }
 
   function handleOpenEditName() {
@@ -237,7 +211,7 @@ export default function ProfileScreen() {
       setIsEditNameModalOpen(false);
     } catch (err) {
       console.error('Failed to update name', err);
-      Alert.alert('Error', 'Failed to update name. Please try again.');
+      showCustomAlert('Error', 'Failed to update name. Please try again.');
     }
   }
 
@@ -312,56 +286,20 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Admin Section */}
-        {isAdmin ? (
-          <Pressable
-            onPress={() => setIsCreateUserOpen(true)}
-            className="mx-4 mt-3 bg-blue-600/15 border border-blue-500/30 rounded-[22px] p-4 flex-row items-center justify-between active:bg-blue-600/25"
-          >
-            <View className="flex-row items-center gap-3">
-              <View className="h-10 w-10 rounded-full bg-blue-500/20 items-center justify-center">
-                <Ionicons name="person-add" size={20} color="#60a5fa" />
-              </View>
-              <View>
-                <Text className="text-[15px] font-semibold text-white">Create New User</Text>
-                <Text className="text-[12px] text-blue-400 font-medium">Admin Only · Register team member</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
-          </Pressable>
-        ) : null}
-
         {/* Settings Options Card */}
-        <View className="mx-4 mt-1 bg-white/5 rounded-[24px] border border-white/10 overflow-hidden">
+        <View className="mx-4 mt-3 bg-white/5 rounded-[24px] border border-white/10 overflow-hidden">
           {SETTINGS_ITEMS.map((item, i) => (
             <SettingsRow
               key={item.title}
               item={item}
               showDivider={i < SETTINGS_ITEMS.length - 1}
               onPress={() => {
-                if (item.title === 'Account') handleOpenEditName();
-                else Alert.alert(item.title, 'Settings view coming soon!');
+                if (item.action === 'edit_name') handleOpenEditName();
+                else if (item.action === 'edit_photo') handleEditPhoto();
+                else if (item.action === 'logout') handleLogout();
               }}
             />
           ))}
-        </View>
-
-        {/* Log Out Section */}
-        <View className="mx-4 mt-4 bg-white/5 rounded-[24px] border border-white/10 overflow-hidden">
-          <Pressable
-            onPress={handleLogout}
-            disabled={logoutMutation.isPending}
-            className="flex-row items-center justify-center gap-2 py-4 active:bg-white/5"
-          >
-            {logoutMutation.isPending ? (
-              <Loader size={20} color="#f87171" />
-            ) : (
-              <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-            )}
-            <Text className="text-[16px] font-semibold text-red-400">
-              {logoutMutation.isPending ? 'Logging out...' : 'Log Out'}
-            </Text>
-          </Pressable>
         </View>
 
         <View style={{ height: 60 }} />
@@ -413,11 +351,149 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-      {/* Create User Modal for Admin */}
-      <CreateUserModal
-        visible={isCreateUserOpen}
-        onClose={() => setIsCreateUserOpen(false)}
-      />
+
+      {/* Custom Change Profile Photo Sheet */}
+      <Modal
+        visible={isPhotoSheetOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsPhotoSheetOpen(false)}
+      >
+        <View className="flex-1 justify-end bg-black/75">
+          <Pressable className="flex-1" onPress={() => setIsPhotoSheetOpen(false)} />
+          <View className="bg-[#121212] rounded-t-[32px] border-t border-white/10 p-6 pb-8">
+            <View className="w-12 h-1 bg-white/20 rounded-full self-center mb-5" />
+
+            <Text className="text-[20px] font-extrabold text-white text-center mb-1">
+              Change Profile Photo
+            </Text>
+            <Text className="text-[13px] text-white/50 text-center mb-6">
+              Choose how you would like to update your avatar
+            </Text>
+
+            <View className="gap-3">
+              <Pressable
+                onPress={() => {
+                  setIsPhotoSheetOpen(false);
+                  setTimeout(() => void pickImageFromCamera(), 200);
+                }}
+                className="flex-row items-center bg-white/7 border border-white/10 rounded-2xl p-4 active:bg-white/15"
+              >
+                <View className="h-11 w-11 rounded-full bg-blue-500/20 items-center justify-center mr-4">
+                  <Ionicons name="camera" size={22} color="#60a5fa" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[16px] font-semibold text-white">Take Photo</Text>
+                  <Text className="text-[13px] text-white/40 mt-0.5">Use your device camera</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setIsPhotoSheetOpen(false);
+                  setTimeout(() => void pickImageFromGallery(), 200);
+                }}
+                className="flex-row items-center bg-white/7 border border-white/10 rounded-2xl p-4 active:bg-white/15"
+              >
+                <View className="h-11 w-11 rounded-full bg-purple-500/20 items-center justify-center mr-4">
+                  <Ionicons name="images" size={22} color="#c084fc" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[16px] font-semibold text-white">Choose from Gallery</Text>
+                  <Text className="text-[13px] text-white/40 mt-0.5">Select photo from library</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+              </Pressable>
+            </View>
+
+            <Pressable
+              onPress={() => setIsPhotoSheetOpen(false)}
+              className="mt-5 py-3.5 bg-white/10 rounded-2xl items-center active:bg-white/15"
+            >
+              <Text className="text-[15px] font-semibold text-white/80">Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Logout Confirmation Sheet */}
+      <Modal
+        visible={isLogoutModalOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsLogoutModalOpen(false)}
+      >
+        <View className="flex-1 justify-end bg-black/75">
+          <Pressable className="flex-1" onPress={() => setIsLogoutModalOpen(false)} />
+          <View className="bg-[#121212] rounded-t-[32px] border-t border-white/10 p-6 pb-8">
+            <View className="w-12 h-1 bg-white/20 rounded-full self-center mb-5" />
+
+            <View className="h-14 w-14 rounded-full bg-red-500/15 border border-red-500/30 items-center justify-center self-center mb-4">
+              <Ionicons name="log-out-outline" size={28} color="#ef4444" />
+            </View>
+
+            <Text className="text-[20px] font-extrabold text-white text-center mb-1">
+              Log out of Vloq Chats?
+            </Text>
+            <Text className="text-[13px] text-white/50 text-center px-4 mb-6 leading-5">
+              You'll be signed out of your account and redirected to the login page.
+            </Text>
+
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => setIsLogoutModalOpen(false)}
+                className="flex-1 py-3.5 bg-white/10 border border-white/10 rounded-2xl items-center active:bg-white/15"
+              >
+                <Text className="text-[15px] font-semibold text-white/80">Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setIsLogoutModalOpen(false);
+                  logoutMutation.mutate();
+                }}
+                disabled={logoutMutation.isPending}
+                className="flex-1 py-3.5 bg-red-600 border border-red-500 rounded-2xl items-center active:bg-red-700 disabled:opacity-50"
+              >
+                {logoutMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text className="text-[15px] font-bold text-white">Log Out</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        visible={customAlertInfo.visible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCustomAlertInfo((prev) => ({ ...prev, visible: false }))}
+      >
+        <View className="flex-1 items-center justify-center bg-black/75 px-6">
+          <View className="w-full max-w-sm bg-[#18181b] rounded-[28px] border border-white/10 p-6 items-center">
+            <View className="h-12 w-12 rounded-full bg-blue-500/20 border border-blue-500/30 items-center justify-center mb-3">
+              <Ionicons name="information-circle" size={26} color="#60a5fa" />
+            </View>
+            <Text className="text-[18px] font-extrabold text-white text-center mb-1">
+              {customAlertInfo.title}
+            </Text>
+            <Text className="text-[13px] text-white/60 text-center mb-5 leading-5">
+              {customAlertInfo.message}
+            </Text>
+            <Pressable
+              onPress={() => setCustomAlertInfo((prev) => ({ ...prev, visible: false }))}
+              className="w-full py-3 bg-white/15 border border-white/15 rounded-2xl items-center active:bg-white/25"
+            >
+              <Text className="text-[15px] font-bold text-white">OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

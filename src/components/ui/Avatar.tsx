@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { getInitials } from "@/lib/utils";
+import { resolveMediaUrl } from "@/lib/api";
 
 const COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f97316",
@@ -26,11 +27,12 @@ type AvatarProps = {
 export function Avatar({ name, url, size = 44, isGroup = false }: AvatarProps) {
   const bg = isGroup ? "#6366f1" : getColor(name);
   const fontSize = size * 0.38;
+  const resolvedUrl = resolveMediaUrl(url);
 
-  if (url) {
+  if (resolvedUrl) {
     return (
       <Image
-        source={{ uri: url }}
+        source={{ uri: resolvedUrl }}
         style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
         contentFit="cover"
       />
