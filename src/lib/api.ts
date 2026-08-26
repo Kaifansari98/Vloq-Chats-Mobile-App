@@ -60,3 +60,16 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url) return "";
+  if (
+    url.startsWith("http://localhost:4000") ||
+    url.startsWith("http://127.0.0.1:4000")
+  ) {
+    const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+    return url.replace(/^http:\/\/(localhost|127\.0\.0\.1):4000/, baseUrl);
+  }
+  return url;
+}
+

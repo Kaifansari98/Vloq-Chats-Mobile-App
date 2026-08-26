@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/constants/theme';
+import { resolveMediaUrl } from '@/lib/api';
 
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f97316',
@@ -139,7 +140,7 @@ export function UserInfoModal({
             {/* User Hero Section */}
             <View style={s.heroSection}>
               {profilePicUrl ? (
-                <Image source={{ uri: profilePicUrl }} style={s.heroAvatarImage} />
+                <Image source={{ uri: resolveMediaUrl(profilePicUrl) }} style={s.heroAvatarImage} />
               ) : (
                 <LinearGradient
                   colors={[avatarBg, '#312e81']}

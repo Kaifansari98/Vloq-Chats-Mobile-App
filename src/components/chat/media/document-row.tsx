@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { formatFileSize } from '@/lib/utils';
 import type { MessageAttachment } from '@/hooks/use-direct-messages';
+import { resolveMediaUrl } from '@/lib/api';
 
 const FILE_TYPE_COLORS: Record<string, string> = {
   pdf: '#ef4444',
@@ -38,10 +39,11 @@ export function DocumentRow({ doc }: { doc: DocumentItem }) {
   const ext = getFileExtension(doc.attachment.name);
   const color = getFileColor(ext);
   const formattedDate = format(new Date(doc.createdAt), 'MMM d, yyyy');
+  const docUrl = resolveMediaUrl(doc.attachment.url);
 
   return (
     <Pressable
-      onPress={() => void Linking.openURL(doc.attachment.url)}
+      onPress={() => void Linking.openURL(docUrl)}
       className="flex-row items-center gap-3.5 px-4 py-3 active:bg-white/5"
     >
       <View

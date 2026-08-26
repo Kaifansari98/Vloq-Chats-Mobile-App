@@ -4,12 +4,14 @@ import type { AuthenticatedUser } from "@/types/auth";
 type AuthState = {
   user: AuthenticatedUser | null;
   token: string | null;
+  fcmToken: string | null;
   isAuthenticated: boolean;
 };
 
 const initialState: AuthState = {
   user: null,
   token: null,
+  fcmToken: null,
   isAuthenticated: false,
 };
 
@@ -25,13 +27,17 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.isAuthenticated = true;
     },
+    setFcmToken(state, action: PayloadAction<string | null>) {
+      state.fcmToken = action.payload;
+    },
     clearCredentials(state) {
       state.user = null;
       state.token = null;
+      state.fcmToken = null;
       state.isAuthenticated = false;
     },
   },
 });
 
-export const { setCredentials, clearCredentials } = authSlice.actions;
+export const { setCredentials, setFcmToken, clearCredentials } = authSlice.actions;
 export default authSlice.reducer;
