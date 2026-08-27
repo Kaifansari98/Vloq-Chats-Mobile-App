@@ -204,18 +204,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 48,
   },
-  logoBadge: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 28,
-  },
-  logo: {
-    width: 140,
-    height: 36,
-  },
   headingContainer: {
     alignItems: 'center',
     marginBottom: 28,
