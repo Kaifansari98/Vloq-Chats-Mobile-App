@@ -182,7 +182,7 @@ export function AttachmentSheet({
               </View>
             ) : isLoadingAssets ? (
               <View className="items-center py-10">
-                <Loader size={32} color="rgba(255,255,255,0.45)" />
+                <Loader size={24} color="rgba(255,255,255,0.45)" />
               </View>
             ) : loadErrorMessage ? (
               <View className="items-center px-6 py-10">

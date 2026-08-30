@@ -7,7 +7,7 @@ import Constants from "expo-constants";
 const environment =
   (process.env.EXPO_PUBLIC_ENVIRONMENT?.toUpperCase() ?? "PRODUCTION");
 
-const productionApiUrl = "https://api-chat.nexyn.com/";
+const productionApiUrl = "https://api-chat.butterflyai.io/";
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
 function getLocalApiUrl(): string {
