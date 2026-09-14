@@ -1,6 +1,6 @@
+import { showDialog, AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState, useMemo } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
@@ -8,11 +8,10 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Platform,
-  Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useOrganizationMembers, type Member } from '@/hooks/use-organization-members';
@@ -68,12 +67,16 @@ export function AddMemberModal({
       onClose();
     } catch (err: any) {
       console.error('Failed to add members:', err);
-      Alert.alert(
+      showDialog(
         'Add Member Error',
         err?.response?.data?.message || 'Could not add member(s) to group. Please try again.'
       );
     }
   }
+
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <Modal
@@ -82,11 +85,10 @@ export function AddMemberModal({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={s.container}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <View style={[s.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-          {/* Header */}
+        {/* Header */}
           <View style={s.header}>
             <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
               <Ionicons name="close" size={22} color="#ffffff" />
@@ -177,7 +179,6 @@ export function AddMemberModal({
               }}
             />
           )}
-        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -187,7 +188,6 @@ const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
   },
   header: {
     flexDirection: 'row',

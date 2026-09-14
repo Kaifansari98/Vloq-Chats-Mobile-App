@@ -63,13 +63,25 @@ api.interceptors.response.use(
 
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return "";
-  if (
-    url.startsWith("http://localhost:4000") ||
-    url.startsWith("http://127.0.0.1:4000")
-  ) {
-    const baseUrl = API_BASE_URL.replace(/\/+$/, "");
-    return url.replace(/^http:\/\/(localhost|127\.0\.0\.1):4000/, baseUrl);
+  const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+
+  // If it's a relative path like "/assets/..." or "assets/..."
+  if (url.startsWith("/")) {
+    return `${baseUrl}${url}`;
   }
+  if (url.startsWith("assets/")) {
+    return `${baseUrl}/${url}`;
+  }
+
+  // If running in LOCAL mode, rewrite any host/IP pointing to port 4000
+  // e.g. http://192.168.0.131:4000/assets/... or http://localhost:4000/assets/...
+  if (environment === "LOCAL") {
+    const localPortMatch = url.match(/^http:\/\/[^/:]+:4000(\/.*)?$/);
+    if (localPortMatch) {
+      return `${baseUrl}${localPortMatch[1] || ""}`;
+    }
+  }
+
   return url;
 }
 

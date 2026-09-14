@@ -1,15 +1,13 @@
+import { showDialog, AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
   Pressable,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -48,17 +46,17 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
 
   async function handleSubmit() {
     if (!name.trim()) {
-      Alert.alert('Required Field', 'Please enter full name of the user.');
+      showDialog('Required Field', 'Please enter full name of the user.');
       return;
     }
 
     if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      showDialog('Invalid Email', 'Please enter a valid email address.');
       return;
     }
 
     if (!password.trim() || password.length < 4) {
-      Alert.alert('Invalid Password', 'Password must be at least 4 characters long.');
+      showDialog('Invalid Password', 'Password must be at least 4 characters long.');
       return;
     }
 
@@ -72,9 +70,9 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
       });
 
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
+      showDialog(
         'User Created 🎉',
-        `Successfully registered ${name.trim()} (${email.trim()}). They can now log in to Vloq Chats.`,
+        `Successfully registered ${name.trim()} (${email.trim()}). They can now log in to ButterflyAI.`,
         [
           {
             text: 'OK',
@@ -84,7 +82,7 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
       );
     } catch (err: any) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(
+      showDialog(
         'Failed to Create User',
         err?.response?.data?.message || err?.message || 'Could not register user. Please try again.'
       );
@@ -100,11 +98,10 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
       statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <View style={[s.container, { paddingTop: topInset }]}>
+      <View style={[s.container, { paddingTop: topInset, paddingBottom: Math.max(insets.bottom, 16) }]}>
         <StatusBar barStyle="light-content" backgroundColor="#111111" translucent />
 
-        <SafeAreaView style={{ flex: 1 }}>
-          {/* Header Bar */}
+        {/* Header Bar */}
           <View style={s.header}>
             <Pressable onPress={handleClose} hitSlop={12} style={s.closeBtn}>
               <Ionicons name="close" size={20} color="#ffffff" />
@@ -137,7 +134,7 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
                 <View style={{ flex: 1 }}>
                   <Text style={s.heroTitle}>New Team Member</Text>
                   <Text style={s.heroSubtitle}>
-                    Register a new user to join your Vloq workspace.
+                    Register a new user to join your ButterflyAI workspace.
                   </Text>
                 </View>
               </View>
@@ -167,7 +164,7 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
                     <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.4)" style={s.inputIcon} />
                     <TextInput
                       style={s.input}
-                      placeholder="e.g. rahul@vloq.com"
+                      placeholder="e.g. rahul@butterflyai.com"
                       placeholderTextColor="rgba(255,255,255,0.35)"
                       value={email}
                       onChangeText={setEmail}
@@ -252,7 +249,6 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
               </Pressable>
             </ScrollView>
           </KeyboardAvoidingView>
-        </SafeAreaView>
       </View>
     </Modal>
   );

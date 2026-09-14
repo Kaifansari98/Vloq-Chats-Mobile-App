@@ -169,7 +169,7 @@ export function useEditDirectMessage(participantUserId?: number) {
       content: string;
     }) => {
       const { data } = await api.put<SendDirectMessageResponse>(
-        `/chats/direct/messages/${messageUuid}`,
+        `/chats/app/direct/messages/${messageUuid}`,
         { content }
       );
       return data;

@@ -90,14 +90,16 @@ export function useGroupDetails(conversationUuid?: string) {
 
 export function useGroupMedia(
   conversationUuid?: string,
-  type: "media" | "docs" | "links" | "all" = "all"
+  type: "media" | "docs" | "links" | "all" = "all",
+  enabled = true,
+  participantUserId?: number
 ) {
   return useQuery<GroupMediaItem[]>({
-    queryKey: ["group-media", conversationUuid, type],
-    enabled: typeof conversationUuid === "string" && conversationUuid.length > 0,
+    queryKey: [participantUserId ? "direct-media" : "group-media", participantUserId ?? conversationUuid, type],
+    enabled: enabled && (participantUserId !== undefined ? Number.isSafeInteger(participantUserId) && participantUserId > 0 : typeof conversationUuid === "string" && conversationUuid.length > 0),
     queryFn: async () => {
       const { data } = await api.get<GroupMediaResponse>(
-        `/chats/group/${conversationUuid}/media?type=${type}`
+        participantUserId !== undefined ? `/chats/direct/${participantUserId}/media?type=${type}` : `/chats/group/${conversationUuid}/media?type=${type}`
       );
       return data.data ?? [];
     },
@@ -110,7 +112,7 @@ export function useAddGroupMembers(conversationUuid?: string) {
   return useMutation({
     mutationFn: async (memberIds: number[]) => {
       const { data } = await api.post<GroupDetailsResponse>(
-        `/chats/group/${conversationUuid}/members`,
+        `/chats/app/group/${conversationUuid}/members`,
         { memberIds }
       );
       return data.data;
@@ -128,7 +130,7 @@ export function useRemoveGroupMember(conversationUuid?: string) {
   return useMutation({
     mutationFn: async (memberId: number) => {
       const { data } = await api.delete(
-        `/chats/group/${conversationUuid}/members/${memberId}`
+        `/chats/app/group/${conversationUuid}/members/${memberId}`
       );
       return data;
     },

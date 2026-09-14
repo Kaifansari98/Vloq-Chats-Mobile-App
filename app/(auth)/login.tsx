@@ -93,9 +93,9 @@ export default function LoginScreen() {
             <View style={styles.logoBadge}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>N</Text>
+                  <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>B</Text>
                 </View>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0f172a' }}>Nexyn Chat</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0f172a' }}>Butterflyai</Text>
               </View>
             </View>
 

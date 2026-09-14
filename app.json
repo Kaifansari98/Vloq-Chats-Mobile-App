@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Vloq Chats",
-    "slug": "vloq-chats-mobile",
+    "name": "ButterflyAI",
+    "slug": "butterflyai",
     "version": "1.0.0",
-    "scheme": "vloqchats",
+    "scheme": "butterflyai",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -27,7 +27,12 @@
       "backgroundColor": "#111111",
       "predictiveBackGestureEnabled": false,
       "package": "com.vloq.chats",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "androidNavigationBar": {
+        "visible": "always",
+        "barStyle": "light-content",
+        "backgroundColor": "#111111"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -44,15 +49,15 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Vloq Chats needs access to your photos to send images.",
-          "cameraPermission": "Vloq Chats needs access to your camera to take photos."
+          "photosPermission": "ButterflyAI needs access to your photos to send images.",
+          "cameraPermission": "ButterflyAI needs access to your camera to take photos."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Vloq Chats needs access to your photos to show your gallery in chat.",
-          "savePhotosPermission": "Vloq Chats needs access to save photos to your gallery.",
+          "photosPermission": "ButterflyAI needs access to your photos to show your gallery in chat.",
+          "savePhotosPermission": "ButterflyAI needs access to save photos to your gallery.",
           "isAccessMediaLocationEnabled": false
         }
       ],
@@ -61,7 +66,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Vloq Chats needs access to your microphone to record voice messages."
+          "microphonePermission": "ButterflyAI needs access to your microphone to record voice messages."
         }
       ],
       "expo-asset"

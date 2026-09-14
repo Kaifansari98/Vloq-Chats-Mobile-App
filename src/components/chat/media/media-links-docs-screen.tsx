@@ -1,9 +1,9 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   Pressable,
-  Modal,
   Animated,
   useWindowDimensions,
 } from 'react-native';

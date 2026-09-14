@@ -337,7 +337,7 @@ export default function ChatsScreen() {
         />
       )}
 
-      {/* Floating Action Button (Vloq Dark Grey Theme for Admin Create User) */}
+      {/* Floating Action Button (ButterflyAI Dark Grey Theme for Admin Create User) */}
       {isAdmin ? (
         <Pressable
           onPress={() => {

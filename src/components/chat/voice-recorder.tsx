@@ -1,5 +1,6 @@
+import { showDialog } from '@/components/ui/app-dialog';
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable, } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useAudioRecorder,
@@ -86,7 +87,7 @@ export function VoiceRecorderBar({
     try {
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showDialog(
           'Microphone access needed',
           'Please allow microphone access to record a voice message.'
         );
@@ -126,7 +127,7 @@ export function VoiceRecorderBar({
         onSend({ uri, name: `voice-${Date.now()}.m4a`, type: 'audio/mp4' });
       } else {
         console.error('Voice recording produced no file (recorder.uri was null)');
-        Alert.alert('Recording failed', 'The voice message could not be saved. Please try again.');
+        showDialog('Recording failed', 'The voice message could not be saved. Please try again.');
       }
     } finally {
       isBusyRef.current = false;

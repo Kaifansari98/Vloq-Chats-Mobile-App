@@ -89,7 +89,7 @@ export function useEditGroupMessage(conversationUuid?: string) {
       content: string;
     }) => {
       const { data } = await api.put<SendGroupMessageResponse>(
-        `/chats/group/${conversationUuid}/messages/${messageUuid}`,
+        `/chats/app/group/${conversationUuid}/messages/${messageUuid}`,
         { content }
       );
       return data;

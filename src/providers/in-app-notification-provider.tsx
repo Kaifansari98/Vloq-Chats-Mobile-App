@@ -67,9 +67,9 @@ type GroupMessagePayload = {
 };
 
 function getMessagePreview(payload: DirectMessagePayload | GroupMessagePayload): string {
-  const msg = payload.message;
+  const msg = payload.message ?? (payload as any);
   return getNotificationPreview({
-    content: msg?.content ?? (payload as DirectMessagePayload).content ?? null,
+    content: msg?.content ?? null,
     attachments: msg?.attachments,
   });
 }
@@ -111,28 +111,29 @@ export function InAppNotificationProvider({ children }: { children: ReactNode })
 
     const socket = getOrCreateSocket(token);
     const currentUserUuid = user?.uuid;
+    const currentUserId = (user as any)?.id as number | undefined;
 
     function handleDirectMessageNew(payload: DirectMessagePayload) {
       console.log('[InAppNotification] Received direct_message:new event. Payload:', JSON.stringify(payload));
-      const msg = payload.message;
-      const senderId = msg?.senderId ?? payload.senderId;
-      const senderUuid = msg?.senderUuid ?? payload.senderUuid;
+      const msg = payload.message ?? (payload as any);
+      const senderId = msg?.senderId;
+      const senderUuid = msg?.senderUuid;
 
       console.log('[InAppNotification] Sender UUID:', senderUuid, 'Current User UUID:', currentUserUuid);
 
       // Don't show notification for own messages
-      if (msg?.isOwnMessage) {
-        console.log('[InAppNotification] Bypassed: msg.isOwnMessage is true');
+      if (senderUuid && senderUuid === currentUserUuid) {
+        console.log('[InAppNotification] Bypassed: sender is current user UUID');
         return;
       }
-      if (senderUuid && senderUuid === currentUserUuid) {
-        console.log('[InAppNotification] Bypassed: sender is current user');
+      if (currentUserId && senderId === currentUserId) {
+        console.log('[InAppNotification] Bypassed: sender is current user ID');
         return;
       }
 
-      const senderName = msg?.senderName ?? payload.senderName ?? 'Someone';
-      const senderProfilePicUrl = msg?.senderProfilePicUrl ?? payload.senderProfilePicUrl ?? null;
-      const conversationUuid = msg?.conversationUuid ?? payload.conversationUuid ?? '';
+      const senderName = msg?.senderName ?? 'Someone';
+      const senderProfilePicUrl = msg?.senderProfilePicUrl ?? null;
+      const conversationUuid = msg?.conversationUuid ?? '';
       const messageUuid = msg?.uuid ?? Date.now().toString();
 
       // Don't show if user is already on that chat screen
@@ -160,19 +161,19 @@ export function InAppNotificationProvider({ children }: { children: ReactNode })
 
     function handleGroupMessageNew(payload: GroupMessagePayload) {
       console.log('[InAppNotification] Received group_message:new event. Payload:', JSON.stringify(payload));
-      const msg = payload.message;
+      const msg = payload.message ?? (payload as any);
       const senderId = msg?.senderId;
       const senderUuid = msg?.senderUuid;
 
       console.log('[InAppNotification] Sender UUID:', senderUuid, 'Current User UUID:', currentUserUuid);
 
       // Don't show notification for own messages
-      if (msg?.isOwnMessage) {
-        console.log('[InAppNotification] Bypassed: msg.isOwnMessage is true');
+      if (senderUuid && senderUuid === currentUserUuid) {
+        console.log('[InAppNotification] Bypassed: sender is current user UUID');
         return;
       }
-      if (senderUuid && senderUuid === currentUserUuid) {
-        console.log('[InAppNotification] Bypassed: sender is current user');
+      if (currentUserId && senderId === currentUserId) {
+        console.log('[InAppNotification] Bypassed: sender is current user ID');
         return;
       }
 

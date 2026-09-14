@@ -1,5 +1,6 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import { useRef, useEffect } from 'react';
-import { View, Text, Pressable, Modal, Animated } from 'react-native';
+import { View, Text, Pressable, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export type MediaQuality = 'STANDARD' | 'HD';
