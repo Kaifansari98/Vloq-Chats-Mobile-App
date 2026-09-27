@@ -1,3 +1,4 @@
+import { showDialog } from '@/components/ui/app-dialog';
 import React, { useState } from 'react';
 import {
   View,
@@ -6,9 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -40,17 +39,17 @@ export default function CreateUserScreen() {
 
   async function handleSubmit() {
     if (!name.trim()) {
-      Alert.alert('Required Field', 'Please enter full name of the user.');
+      showDialog('Required Field', 'Please enter full name of the user.');
       return;
     }
 
     if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      showDialog('Invalid Email', 'Please enter a valid email address.');
       return;
     }
 
-    if (!password.trim() || password.length < 4) {
-      Alert.alert('Invalid Password', 'Password must be at least 4 characters long.');
+    if (!password.trim() || password.length < 6) {
+      showDialog('Invalid Password', 'Password must be at least 6 characters long.');
       return;
     }
 
@@ -64,31 +63,43 @@ export default function CreateUserScreen() {
       });
 
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
+      showDialog(
         'User Created 🎉',
-        `Successfully registered ${name.trim()} (${email.trim()}). They can now log in to Vloq Chats.`,
+        `Successfully registered ${name.trim()} (${email.trim()}). They can now log in to ButterflyAI.`,
         [
           {
             text: 'OK',
             onPress: handleBack,
           },
-        ]
+        ],
+        {
+          autoDismissMs: 3000,
+        }
       );
     } catch (err: any) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(
-        'Failed to Create User',
-        err?.response?.data?.message || err?.message || 'Could not register user. Please try again.'
-      );
+      let rawMsg = err?.response?.data?.message;
+      if (typeof rawMsg === 'object' && rawMsg !== null) {
+        const errorObj = rawMsg as { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
+        const firstFieldError = errorObj.fieldErrors ? Object.values(errorObj.fieldErrors)?.[0]?.[0] : undefined;
+        rawMsg = firstFieldError || errorObj.formErrors?.[0] || JSON.stringify(rawMsg);
+      }
+      const errorMsg = typeof rawMsg === 'string' && rawMsg.length > 0
+        ? rawMsg
+        : err?.message || 'Could not register user. Please try again.';
+
+      showDialog('Failed to Create User', errorMsg);
     }
   }
 
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
+
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
+    <View style={[s.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent />
 
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header Bar */}
+      {/* Header Bar */}
         <View style={s.header}>
           <Pressable onPress={handleBack} hitSlop={12} style={s.backBtn}>
             <Ionicons name="arrow-back" size={20} color="#ffffff" />
@@ -121,7 +132,7 @@ export default function CreateUserScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.heroTitle}>New Team Member</Text>
                 <Text style={s.heroSubtitle}>
-                  Register a new user to join your Vloq workspace.
+                  Register a new user to join your ButterflyAI workspace.
                 </Text>
               </View>
             </View>
@@ -151,7 +162,7 @@ export default function CreateUserScreen() {
                   <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.4)" style={s.inputIcon} />
                   <TextInput
                     style={s.input}
-                    placeholder="e.g. rahul@vloq.com"
+                    placeholder="e.g. rahul@butterflyai.com"
                     placeholderTextColor="rgba(255,255,255,0.35)"
                     value={email}
                     onChangeText={setEmail}
@@ -234,9 +245,17 @@ export default function CreateUserScreen() {
                 )}
               </LinearGradient>
             </Pressable>
+
+            {/* Cancel Button */}
+            <Pressable
+              onPress={handleBack}
+              disabled={createUserMutation.isPending}
+              style={s.cancelBtn}
+            >
+              <Text style={s.cancelBtnText}>Cancel</Text>
+            </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
     </View>
   );
 }
@@ -394,5 +413,20 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  cancelBtn: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });

@@ -1,17 +1,19 @@
+import { useDirectInfo } from '@/hooks/use-direct-info';
+import { GroupMediaModal } from '@/components/chat/group-media-modal';
+import { showDialog, AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   Pressable,
   ScrollView,
   Image,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
-  Alert,
   Switch,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -44,126 +46,120 @@ function getInitials(name: string) {
 
 type UserInfoModalProps = {
   visible: boolean;
+  participantUserId: number;
   name: string;
   profilePicUrl?: string | null;
   email?: string | null;
   isOnline?: boolean;
   onClose: () => void;
-  onOpenMediaGallery?: () => void;
 };
 
 export function UserInfoModal({
   visible,
-  name,
-  profilePicUrl,
-  email,
+  participantUserId,
+  name: fallbackName,
+  profilePicUrl: fallbackProfilePicUrl,
+  email: fallbackEmail,
   isOnline,
   onClose,
-  onOpenMediaGallery,
 }: UserInfoModalProps) {
+  const insets = useSafeAreaInsets();
+  const info = useDirectInfo(participantUserId, visible);
+  const name = info.data?.participant.name ?? fallbackName;
+  const profilePicUrl = info.data ? info.data.participant.profilePicUrl : fallbackProfilePicUrl;
+  const email = info.data?.participant.email ?? fallbackEmail;
+  const [mediaVisible, setMediaVisible] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const avatarBg = getAvatarColor(name || 'User');
 
-  function handleBlockUser() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      'Block User',
-      `Are you sure you want to block ${name}? They will no longer be able to send you messages.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Blocked', `${name} has been blocked.`);
-            onClose();
-          },
-        },
-      ]
-    );
-  }
-
-  function handleReportUser() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      'Report User',
-      `Report ${name} for spam or inappropriate behavior?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Reported', 'Thank you. We have received your report.');
-            onClose();
-          },
-        },
-      ]
-    );
-  }
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
+    <>
     <Modal
       visible={visible}
       animationType="slide"
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={s.modalContainer}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <View style={[s.modalContainer, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-          {/* Header bar */}
-          <View style={s.headerBar}>
-            <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
-              <Ionicons name="close" size={22} color="#ffffff" />
-            </Pressable>
+        {/* Header bar */}
+        <View style={s.headerBar}>
+          <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
+            <Ionicons name="close" size={22} color="#ffffff" />
+          </Pressable>
 
-            <Text style={s.headerTitle}>Contact Info</Text>
+          <Text style={s.headerTitle}>Chat Info</Text>
 
-            <Pressable
-              onPress={() => {
-                Alert.alert('Contact Options', 'More options coming soon!');
-              }}
-              hitSlop={10}
-              style={s.iconBtn}
-            >
-              <Ionicons name="ellipsis-vertical" size={20} color="#ffffff" />
-            </Pressable>
-          </View>
-
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 40 }}
-            showsVerticalScrollIndicator={false}
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync();
+              showDialog(
+                'Chat Options',
+                undefined,
+                [
+                  {
+                    text: 'View Media & Docs',
+                    onPress: () => setMediaVisible(true),
+                  },
+                  {
+                    text: isMuted ? 'Unmute Notifications' : 'Mute Notifications',
+                    onPress: () => {
+                      setIsMuted(!isMuted);
+                      void Haptics.selectionAsync();
+                    },
+                  },
+                  {
+                    text: 'Close Info',
+                    onPress: onClose,
+                  },
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                  },
+                ],
+                { cancelable: true }
+              );
+            }}
+            hitSlop={10}
+            style={s.iconBtn}
           >
-            {/* User Hero Section */}
-            <View style={s.heroSection}>
-              {profilePicUrl ? (
-                <Image source={{ uri: resolveMediaUrl(profilePicUrl) }} style={s.heroAvatarImage} />
-              ) : (
-                <LinearGradient
-                  colors={[avatarBg, '#312e81']}
-                  style={s.heroAvatarGradient}
-                >
-                  <Text style={s.heroAvatarText}>{getInitials(name || 'User')}</Text>
-                </LinearGradient>
-              )}
+            <Ionicons name="ellipsis-vertical" size={20} color="#ffffff" />
+          </Pressable>
+        </View>
 
-              <Text style={s.heroTitle}>{name}</Text>
-              <Text style={s.heroSubtitle}>
-                {isOnline ? '🟢 Active now' : 'Offline'}
-              </Text>
-            </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* User Hero Section */}
+          <View style={s.heroSection}>
+            {profilePicUrl ? (
+              <Image source={{ uri: resolveMediaUrl(profilePicUrl) }} style={s.heroAvatarImage} />
+            ) : (
+              <LinearGradient
+                colors={[avatarBg, `${avatarBg}cc`]}
+                style={s.heroAvatarGradient}
+              >
+                <Text style={s.heroAvatarText}>{getInitials(name || 'User')}</Text>
+              </LinearGradient>
+            )}
+
+            <Text style={s.heroTitle}>{name}</Text>
+            <Text style={s.heroSubtitle}>{isOnline ? 'Online' : 'Offline'}</Text>
 
             {/* Quick Action Buttons */}
             <View style={s.actionRow}>
               <Pressable
-                onPress={() => {
-                  onClose();
-                  onOpenMediaGallery?.();
-                }}
                 style={s.actionCard}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setMediaVisible(true);
+                }}
               >
                 <View style={s.actionIconBox}>
                   <Ionicons name="images-outline" size={20} color="#60a5fa" />
@@ -172,11 +168,11 @@ export function UserInfoModal({
               </Pressable>
 
               <Pressable
-                onPress={() => {
-                  setIsMuted((prev) => !prev);
-                  void Haptics.selectionAsync();
-                }}
                 style={s.actionCard}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setIsMuted(!isMuted);
+                }}
               >
                 <View style={s.actionIconBox}>
                   <Ionicons
@@ -185,14 +181,15 @@ export function UserInfoModal({
                     color="#60a5fa"
                   />
                 </View>
-                <Text style={s.actionLabel}>{isMuted ? 'Muted' : 'Mute'}</Text>
+                <Text style={s.actionLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
               </Pressable>
 
               <Pressable
+                style={s.actionCard}
                 onPress={() => {
+                  void Haptics.selectionAsync();
                   onClose();
                 }}
-                style={s.actionCard}
               >
                 <View style={s.actionIconBox}>
                   <Ionicons name="chatbubble-ellipses-outline" size={20} color="#60a5fa" />
@@ -200,77 +197,70 @@ export function UserInfoModal({
                 <Text style={s.actionLabel}>Message</Text>
               </Pressable>
             </View>
+          </View>
 
-            {/* Information Section */}
-            <View style={s.sectionCard}>
-              {email ? (
-                <View style={s.infoItem}>
-                  <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
-                  <View style={s.infoTextContainer}>
-                    <Text style={s.infoLabel}>Email</Text>
-                    <Text style={s.infoValue}>{email}</Text>
-                  </View>
-                </View>
-              ) : null}
-
+          {/* User Details / Info Section */}
+          <View style={s.sectionCard}>
+            {email ? (
               <View style={s.infoItem}>
-                <Ionicons name="information-circle-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
+                <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.6)" />
                 <View style={s.infoTextContainer}>
-                  <Text style={s.infoLabel}>About</Text>
-                  <Text style={s.infoValue}>Hey there! I am using Vloq Chats.</Text>
+                  <Text style={s.infoLabel}>Email</Text>
+                  <Text style={s.infoValue}>{email}</Text>
                 </View>
               </View>
-            </View>
+            ) : null}
 
-            {/* Settings & Options */}
-            <View style={s.sectionCard}>
-              <Pressable
-                style={s.settingRow}
-                onPress={() => {
-                  onClose();
-                  onOpenMediaGallery?.();
-                }}
-              >
-                <View style={s.settingLeft}>
-                  <Ionicons name="images-outline" size={20} color="#60a5fa" />
+            <View style={[s.infoItem, !email && { borderTopWidth: 0 }]}>
+              <Ionicons name="information-circle-outline" size={20} color="rgba(255, 255, 255, 0.6)" />
+              <View style={s.infoTextContainer}>
+                <Text style={s.infoLabel}>About</Text>
+                <Text style={s.infoValue}>Hey there! I am using ButterflyAI.</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Settings / Controls */}
+          <View style={s.sectionCard}>
+            <Pressable
+              style={s.settingRow}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setMediaVisible(true);
+              }}
+            >
+              <View style={s.settingLeft}>
+                <Ionicons name="images-outline" size={20} color="#60a5fa" />
+                <View style={{ flex: 1 }}>
                   <Text style={s.settingLabel}>Media, links, and docs</Text>
+                  {info.data && <Text style={[s.infoLabel, { marginTop: 4 }]}>{info.data.mediaCount} photos/videos · {info.data.docsCount} docs · {info.data.linksCount} links</Text>}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
-              </Pressable>
-
-              <View style={s.settingRow}>
-                <View style={s.settingLeft}>
-                  <Ionicons name="notifications-outline" size={20} color="#60a5fa" />
-                  <Text style={s.settingLabel}>Mute Notifications</Text>
-                </View>
-                <Switch
-                  value={isMuted}
-                  onValueChange={(val) => {
-                    setIsMuted(val);
-                    void Haptics.selectionAsync();
-                  }}
-                  trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#3b82f6' }}
-                  thumbColor="#ffffff"
-                />
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
+            </Pressable>
 
-            {/* Danger Zone / Block & Report */}
-            <View style={s.sectionCard}>
-              <Pressable style={s.dangerRow} onPress={handleBlockUser}>
-                <Ionicons name="ban-outline" size={20} color="#f87171" />
-                <Text style={s.dangerLabel}>Block {name}</Text>
-              </Pressable>
-
-              <Pressable style={s.dangerRow} onPress={handleReportUser}>
-                <Ionicons name="thumbs-down-outline" size={20} color="#f87171" />
-                <Text style={s.dangerLabel}>Report {name}</Text>
-              </Pressable>
+            <View style={s.settingRow}>
+              <View style={s.settingLeft}>
+                <Ionicons name="notifications-outline" size={20} color="#60a5fa" />
+                <Text style={s.settingLabel}>Mute Notifications</Text>
+              </View>
+              <Switch
+                value={isMuted}
+                onValueChange={(val) => {
+                  setIsMuted(val);
+                  void Haptics.selectionAsync();
+                }}
+                trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#3b82f6' }}
+                thumbColor="#ffffff"
+              />
             </View>
-          </ScrollView>
-        </SafeAreaView>
+          </View>
+        </ScrollView>
       </View>
     </Modal>
+    <GroupMediaModal visible={visible && mediaVisible} groupUuid="" groupName={name}
+      participantUserId={participantUserId} onClose={() => setMediaVisible(false)} />
+    </>
   );
 }
 
@@ -412,19 +402,5 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: '#ffffff',
     fontWeight: '500',
-  },
-  dangerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  dangerLabel: {
-    fontSize: 15,
-    color: '#f87171',
-    fontWeight: '600',
   },
 });

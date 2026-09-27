@@ -11,6 +11,10 @@ const productionApiUrl = "https://api-chat.butterflyai.io/";
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
 function getLocalApiUrl(): string {
+  if (configuredApiUrl) {
+    return configuredApiUrl.endsWith("/") ? configuredApiUrl : `${configuredApiUrl}/`;
+  }
+
   const hostUri =
     Constants.expoConfig?.hostUri ||
     (Constants as Record<string, any>).manifest?.debuggerHost ||
@@ -23,11 +27,13 @@ function getLocalApiUrl(): string {
     }
   }
 
-  return configuredApiUrl || "http://192.168.1.105:4000/";
+  return "http://10.19.114.117:4000/";
 }
 
 export const API_BASE_URL =
-  environment === "LOCAL" ? getLocalApiUrl() : productionApiUrl;
+  environment === "LOCAL"
+    ? getLocalApiUrl()
+    : (configuredApiUrl || productionApiUrl);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -51,7 +57,7 @@ api.interceptors.response.use(
   async (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const url = error.config?.url ?? "";
-      const isAuthEndpoint = url.includes("/auth/");
+      const isAuthEndpoint = url.includes("/auth/") || url.includes("/app/auth/");
       if (!isAuthEndpoint) {
         await clearAuth();
         router.replace("/(auth)/login");
@@ -63,13 +69,22 @@ api.interceptors.response.use(
 
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return "";
-  if (
-    url.startsWith("http://localhost:4000") ||
-    url.startsWith("http://127.0.0.1:4000")
-  ) {
-    const baseUrl = API_BASE_URL.replace(/\/+$/, "");
-    return url.replace(/^http:\/\/(localhost|127\.0\.0\.1):4000/, baseUrl);
+  const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+
+  // If it's a relative path like "/assets/..." or "assets/..."
+  if (url.startsWith("/")) {
+    return `${baseUrl}${url}`;
   }
+  if (url.startsWith("assets/")) {
+    return `${baseUrl}/${url}`;
+  }
+
+  // If URL has local port 4000 / localhost / local IP, rewrite to active baseUrl
+  const localPortMatch = url.match(/^http:\/\/[^/:]+:(?:4000|3000|8000)(\/.*)?$/);
+  if (localPortMatch) {
+    return `${baseUrl}${localPortMatch[1] || ""}`;
+  }
+
   return url;
 }
 

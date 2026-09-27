@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Image,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -201,14 +200,16 @@ export default function CreateGroupScreen() {
     }
   }
 
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
+
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1 }}
-        >
+    <View style={[s.root, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
           {/* ───── Step 1: Select Members ───── */}
           {step === 'select' ? (
             <View style={{ flex: 1 }}>
@@ -477,7 +478,6 @@ export default function CreateGroupScreen() {
             </View>
           )}
         </KeyboardAvoidingView>
-      </SafeAreaView>
     </View>
   );
 }

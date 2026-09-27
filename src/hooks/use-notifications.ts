@@ -34,7 +34,7 @@ export function useNotifications(page = 1, limit = 20) {
   return useQuery<NotificationsResponse>({
     queryKey: ["notifications", page, limit],
     queryFn: async () => {
-      const { data } = await api.get<NotificationsResponse>("/notifications", {
+      const { data } = await api.get<NotificationsResponse>("/app/notifications", {
         params: { page, limit },
       });
       return data;
@@ -47,7 +47,7 @@ export function useUnreadNotificationCount() {
     queryKey: ["notifications", "unread-count"],
     queryFn: async () => {
       const { data } = await api.get<UnreadCountResponse>(
-        "/notifications/unread-count"
+        "/app/notifications/unread-count"
       );
       return data;
     },
@@ -59,7 +59,7 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: async (notificationUuid: string) => {
       const { data } = await api.post<{ message: string }>(
-        "/notifications/read",
+        "/app/notifications/read",
         { notificationUuid }
       );
       return data;
@@ -75,7 +75,7 @@ export function useMarkAllNotificationsRead() {
   return useMutation({
     mutationFn: async () => {
       const { data } = await api.post<{ message: string }>(
-        "/notifications/read-all"
+        "/app/notifications/read-all"
       );
       return data;
     },

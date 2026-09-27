@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'vloq_noise_reduction';
+const STORAGE_KEY = 'butterflyai_noise_reduction';
 
 /**
  * Manages noise reduction preference for voice recording.

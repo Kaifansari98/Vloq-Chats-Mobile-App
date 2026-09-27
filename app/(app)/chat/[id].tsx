@@ -1,3 +1,7 @@
+import { MessageText } from '@/components/chat/message-text';
+import { useAndroidKeyboardInset } from '@/hooks/use-android-keyboard-inset';
+import { MessageSearch } from '@/components/chat/message-search';
+import { showDialog, AppModal as Modal } from '@/components/ui/app-dialog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -6,15 +10,14 @@ import {
   Pressable,
   FlatList,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Keyboard,
   Linking,
   Platform,
   Animated,
-  Modal,
   useWindowDimensions,
   Easing,
+  type ViewToken,
 } from 'react-native';
 import { Loader } from '@/components/ui/Loader';
 import {
@@ -32,7 +35,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { Avatar } from '@/components/ui/Avatar';
 import { TypingDots } from '@/components/typing-dots';
@@ -861,8 +864,8 @@ function MessageBubble({
       highlightOpacity.setValue(1);
       Animated.timing(highlightOpacity, {
         toValue: 0,
-        duration: 900,
-        delay: 300,
+        duration: 1600,
+        delay: 800,
         useNativeDriver: true,
       }).start();
     }
@@ -1306,9 +1309,7 @@ function MessageBubble({
               ) : null}
 
               {message.content ? (
-                <Text className={`text-[15px] ${isOwn ? 'text-white' : 'text-white/95'}`}>
-                  {message.content}
-                </Text>
+                <MessageText content={message.content} isOwn={isOwn} />
               ) : null}
 
               {!isAudioOnlyMessage && !isFileOnlyMessage ? (
@@ -1354,6 +1355,7 @@ export default function ChatScreen() {
   const profilePicUrl = params.profilePicUrl || null;
 
   const insets = useSafeAreaInsets();
+  const { containerRef, bottomInset: keyboardInset, onContainerLayout } = useAndroidKeyboardInset();
   const { typingUserIds, groupTypingUsers, onlineUserIds } = useChatSocketState();
   const listRef = useRef<FlatList<RenderRow>>(null);
   const textInputRef = useRef<TextInput>(null);
@@ -1377,6 +1379,30 @@ export default function ChatScreen() {
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchOpenRef = useRef(false);
+  searchOpenRef.current = isSearchOpen;
+  const preserveMessagePositionRef = useRef(false);
+  const pendingJumpRef = useRef<{ uuid: string; index: number; attempts: number; started: boolean } | null>(null);
+  const jumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleRowsRef = useRef<ViewToken<RenderRow>[]>([]);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 1 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<RenderRow>[] }) => {
+    visibleRowsRef.current = viewableItems;
+    const target = pendingJumpRef.current;
+    if (!target?.started || !viewableItems.some(({ item }) => item.kind === 'message' && item.message.uuid === target.uuid)) return;
+    pendingJumpRef.current = null;
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    setHighlightedMessageUuid(target.uuid);
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = setTimeout(() => setHighlightedMessageUuid(null), 2400);
+  }).current;
+
+  useEffect(() => () => {
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+  }, []);
+
 
   // ── New feature state ──
   const [actionMessage, setActionMessage] = useState<DirectMessage | null>(null);
@@ -1395,7 +1421,7 @@ export default function ChatScreen() {
 
   const scrollToBottom = useCallback((animated = true) => {
     requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated });
+      if (!pendingJumpRef.current) listRef.current?.scrollToEnd({ animated });
     });
   }, []);
 
@@ -1406,14 +1432,14 @@ export default function ChatScreen() {
       setIsKeyboardVisible(true);
 
       setTimeout(() => {
-        listRef.current?.scrollToEnd({ animated: true });
+        if (!searchOpenRef.current && !preserveMessagePositionRef.current) listRef.current?.scrollToEnd({ animated: true });
       }, Platform.OS === 'android' ? 250 : 100);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setIsKeyboardVisible(false);
 
       requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: false });
+        if (!searchOpenRef.current && !preserveMessagePositionRef.current) listRef.current?.scrollToEnd({ animated: false });
       });
     });
     return () => {
@@ -1568,7 +1594,7 @@ export default function ChatScreen() {
       if (!statusResult.granted) {
         const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!req.granted) {
-          Alert.alert('Permission needed', 'Please allow photo access to continue.');
+          showDialog('Permission needed', 'Please allow photo access to continue.');
           return;
         }
       }
@@ -1577,7 +1603,7 @@ export default function ChatScreen() {
       if (!statusResult.granted) {
         const req = await ImagePicker.requestCameraPermissionsAsync();
         if (!req.granted) {
-          Alert.alert('Permission needed', 'Please allow camera access to continue.');
+          showDialog('Permission needed', 'Please allow camera access to continue.');
           return;
         }
       }
@@ -1639,7 +1665,7 @@ export default function ChatScreen() {
         },
         onError: (error) => {
           console.error('Failed to send media', error);
-          Alert.alert('Upload failed', 'Could not upload files. Please try again.');
+          showDialog('Upload failed', 'Could not upload files. Please try again.');
         },
       }
     );
@@ -1752,13 +1778,44 @@ export default function ChatScreen() {
     const index = rows.findIndex(
       (row) => row.kind === 'message' && row.message.uuid === messageUuid
     );
-    if (index === -1) return;
+    if (index === -1) {
+      showDialog('Message unavailable', 'This message is no longer available in this chat.');
+      return;
+    }
+    preserveMessagePositionRef.current = true;
+    showScrollToBottomRef.current = true;
+    setShowScrollToBottom(true);
+    setHighlightedMessageUuid(null);
+    pendingJumpRef.current = { uuid: messageUuid, index, attempts: 0, started: false };
+    Keyboard.dismiss();
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    // Let the search modal and keyboard finish closing before moving the chat.
+    jumpTimerRef.current = setTimeout(() => {
+      const target = pendingJumpRef.current;
+      if (!target) return;
+      target.started = true;
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+      onViewableItemsChanged({ viewableItems: visibleRowsRef.current });
+    }, 400);
+  }
 
-    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
-
-    setHighlightedMessageUuid(messageUuid);
-    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-    highlightTimeoutRef.current = setTimeout(() => setHighlightedMessageUuid(null), 1200);
+  function handleScrollToIndexFailed(info: { index: number; averageItemLength: number }) {
+    const target = pendingJumpRef.current;
+    if (!target || target.index !== info.index) return;
+    if (target.attempts >= 12) {
+      pendingJumpRef.current = null;
+      showDialog('Could not open message', 'Please try selecting the search result again.');
+      return;
+    }
+    target.attempts += 1;
+    // Move the render window near the unmeasured row before retrying its exact position.
+    listRef.current?.scrollToOffset({ offset: Math.max(0, info.averageItemLength * info.index), animated: false });
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    jumpTimerRef.current = setTimeout(() => {
+      if (pendingJumpRef.current === target) {
+        listRef.current?.scrollToIndex({ index: target.index, animated: true, viewPosition: 0.3 });
+      }
+    }, 180);
   }
 
   function handleAttachPress() {
@@ -1841,7 +1898,7 @@ export default function ChatScreen() {
           const message =
             (responseData as { message?: string | string[] })?.message ??
             'Could not send the voice message. Please try again.';
-          Alert.alert('Voice message failed', Array.isArray(message) ? message.join('\n') : message);
+          showDialog('Voice message failed', Array.isArray(message) ? message.join('\n') : message);
         },
       }
     );
@@ -1856,7 +1913,19 @@ export default function ChatScreen() {
   })();
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <SafeAreaView
+      edges={isKeyboardVisible ? [] : ['bottom']}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+    >
+    <View ref={containerRef} collapsable={false} onLayout={onContainerLayout} className="flex-1 bg-background" style={{ paddingTop: insets.top, paddingBottom: keyboardInset }}>
+      {isSearchOpen && <MessageSearch
+        key={`${isGroup}-${conversationUuid}-${memberId}`}
+        isGroup={isGroup}
+        conversationUuid={conversationUuid}
+        memberId={memberId}
+        onClose={() => setIsSearchOpen(false)}
+        onSelect={handleJumpToMessage}
+      />}
       {/* Header */}
       <View className="flex-row items-center gap-3 border-b border-white/8 px-3 pb-3">
         <Pressable
@@ -1941,29 +2010,13 @@ export default function ChatScreen() {
                     className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
                     onPress={() => {
                       setIsMenuOpen(false);
-                      Alert.alert('Search', 'Search feature coming soon!');
+                      setIsSearchOpen(true);
                     }}
                   >
                     <Ionicons name="search" size={18} color="#ffffff" />
                     <Text className="text-white text-[15px]">Search</Text>
                   </Pressable>
-                  <Pressable
-                    className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
-                    onPress={() => {
-                      setIsMenuOpen(false);
-                      Alert.alert(
-                        'Clear Chat',
-                        'Are you sure you want to clear this chat?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Clear', style: 'destructive', onPress: () => console.log('Clear chat triggered') }
-                        ]
-                      );
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#f87171" />
-                    <Text className="text-red-400 text-[15px]">Clear Chat</Text>
-                  </Pressable>
+
                   <Pressable
                     className="px-4 py-3 active:bg-white/5 flex-row items-center gap-3"
                     onPress={() => {
@@ -1983,9 +2036,10 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 52 : 0}
-        enabled
+        // Android uses the measured root overlap above; iOS uses native keyboard avoidance.
+        enabled={Platform.OS === 'ios'}
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
@@ -2011,6 +2065,7 @@ export default function ChatScreen() {
               <FlatList
                 ref={listRef}
                 data={rows}
+                extraData={highlightedMessageUuid}
                 keyExtractor={(row) => row.key}
                 style={{ flex: 1 }}
                 contentContainerStyle={{
@@ -2022,7 +2077,7 @@ export default function ChatScreen() {
                 keyboardShouldPersistTaps="always"
                 keyboardDismissMode="none"
                 onContentSizeChange={() => {
-                  if (isInitialLoadRef.current || !showScrollToBottomRef.current) {
+                  if (!preserveMessagePositionRef.current && (isInitialLoadRef.current || !showScrollToBottomRef.current)) {
                     listRef.current?.scrollToEnd({ animated: false });
                   }
                 }}
@@ -2035,14 +2090,13 @@ export default function ChatScreen() {
                   showScrollToBottomRef.current = isFarFromBottom;
                 }}
                 scrollEventThrottle={100}
-                onScrollToIndexFailed={(info) => {
-                  setTimeout(() => {
-                    listRef.current?.scrollToIndex({
-                      index: info.index,
-                      animated: true,
-                      viewPosition: 0.3,
-                    });
-                  }, 100);
+                onScrollToIndexFailed={handleScrollToIndexFailed}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                onScrollBeginDrag={() => {
+                  preserveMessagePositionRef.current = false;
+                  pendingJumpRef.current = null;
+                  if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
                 }}
                 renderItem={({ item, index }) => {
                   if (item.kind === 'divider') {
@@ -2208,9 +2262,8 @@ export default function ChatScreen() {
         <View
           className="flex-row items-end gap-2 border-t border-white/15 bg-[#111111] px-3 pt-3"
           style={{
-            paddingBottom: isKeyboardVisible
-              ? 10
-              : Math.max(insets.bottom, 10),
+            paddingBottom: 10,
+            flexShrink: 0,
           }}
         >
           {voiceRecorderPhase === 'idle' ? (
@@ -2239,7 +2292,7 @@ export default function ChatScreen() {
                   value={content}
                   onChangeText={handleContentChange}
                   onFocus={() => {
-                    if (isInitialLoadRef.current || !showScrollToBottomRef.current) {
+                    if (!preserveMessagePositionRef.current && (isInitialLoadRef.current || !showScrollToBottomRef.current)) {
                       scrollToBottom(true);
                     }
                   }}
@@ -2340,7 +2393,7 @@ export default function ChatScreen() {
         onForwardComplete={() => {
           setIsForwardPickerVisible(false);
           setForwardTargetMessage(null);
-          Alert.alert('Forwarded', 'Message forwarded successfully!');
+          showDialog('Forwarded', 'Message forwarded successfully!');
         }}
       />
 
@@ -2387,13 +2440,14 @@ export default function ChatScreen() {
       />
 
       <UserInfoModal
+        participantUserId={memberId}
         visible={isUserInfoVisible}
         name={name}
         profilePicUrl={profilePicUrl}
         isOnline={isOnline}
         onClose={() => setIsUserInfoVisible(false)}
-        onOpenMediaGallery={() => setIsMediaGalleryVisible(true)}
       />
     </View>
+    </SafeAreaView>
   );
 }

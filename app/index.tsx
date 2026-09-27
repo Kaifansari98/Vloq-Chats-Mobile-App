@@ -16,11 +16,11 @@ const BACKGROUND_SLIDES: WelcomeSlide[] = [
   { id: '4', image: require('../assets/welcome-screen/image4.jpg') },
 ];
 
-const STATIC_TITLE = 'Vloq Chats';
+const STATIC_TITLE = 'ButterflyAI';
 const STATIC_DESCRIPTION =
   'Seamless, real-time communication across every stage of your project lifecycle.';
 
-const HAS_SEEN_WELCOME_KEY = 'vloq_has_seen_welcome';
+const HAS_SEEN_WELCOME_KEY = 'butterflyai_has_seen_welcome';
 
 export default function WelcomeScreen() {
   const [, setActiveIndex] = useState(0);

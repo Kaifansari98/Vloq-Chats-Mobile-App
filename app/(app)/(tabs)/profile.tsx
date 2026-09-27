@@ -1,3 +1,4 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState } from 'react';
 import {
   View,
@@ -5,7 +6,6 @@ import {
   Pressable,
   StatusBar,
   ScrollView,
-  Modal,
   TextInput,
   ActivityIndicator,
 } from 'react-native';
@@ -130,7 +130,7 @@ export default function ProfileScreen() {
   const userName = user?.name ?? 'User';
   const userEmail = user?.email ?? '';
   const profilePic = user?.profile_pic_url ?? null;
-  const orgName = user?.organizationName ?? 'Vloq Workspace';
+  const orgName = user?.organizationName ?? 'ButterflyAI Workspace';
   const roleCode = user?.userTypeCode ?? 'MEMBER';
 
   const isAdmin =
@@ -434,7 +434,7 @@ export default function ProfileScreen() {
             </View>
 
             <Text className="text-[20px] font-extrabold text-white text-center mb-1">
-              Log out of Vloq Chats?
+              Log out of ButterflyAI?
             </Text>
             <Text className="text-[13px] text-white/50 text-center px-4 mb-6 leading-5">
               You'll be signed out of your account and redirected to the login page.

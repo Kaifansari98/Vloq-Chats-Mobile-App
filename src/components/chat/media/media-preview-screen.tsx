@@ -1,9 +1,9 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import { useState, useRef } from 'react';
 import {
   View,
   Text,
   Pressable,
-  Modal,
   TextInput,
   Image,
   KeyboardAvoidingView,

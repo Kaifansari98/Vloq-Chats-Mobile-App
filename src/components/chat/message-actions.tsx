@@ -1,9 +1,9 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import { useRef, useEffect } from 'react';
 import {
   View,
   Text,
   Pressable,
-  Modal,
   Animated,
   Clipboard,
   Platform,

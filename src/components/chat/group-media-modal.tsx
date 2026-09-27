@@ -1,6 +1,9 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { resolveMediaUrl } from '@/lib/api';
+import { showDialog } from '@/components/ui/app-dialog';
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   Pressable,
@@ -8,12 +11,11 @@ import {
   Image,
   Linking,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useGroupMedia, type GroupMediaItem } from '@/hooks/use-group-chats';
+import { useGroupMedia } from '@/hooks/use-group-chats';
 import { Loader } from '@/components/ui/Loader';
 import { COLORS } from '@/constants/theme';
 import { formatFileSize } from '@/lib/utils';
@@ -21,6 +23,7 @@ import { formatFileSize } from '@/lib/utils';
 type GroupMediaModalProps = {
   visible: boolean;
   groupUuid: string;
+  participantUserId?: number;
   groupName: string;
   onClose: () => void;
 };
@@ -30,17 +33,22 @@ type TabType = 'media' | 'docs' | 'links';
 export function GroupMediaModal({
   visible,
   groupUuid,
+  participantUserId,
   groupName,
   onClose,
 }: GroupMediaModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('media');
-  const { data: mediaItems = [], isLoading } = useGroupMedia(groupUuid, activeTab);
+  const { data: mediaItems = [], isLoading, isError, refetch } = useGroupMedia(groupUuid, activeTab, visible, participantUserId);
 
   function handleOpenLink(url: string) {
-    void Linking.openURL(url).catch((err) =>
-      console.warn('Could not open link:', err)
+    void Linking.openURL(resolveMediaUrl(url)).catch(() =>
+      showDialog('Could not open file', 'Please try again or check your connection.')
     );
   }
+
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <Modal
@@ -49,11 +57,10 @@ export function GroupMediaModal({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={s.container}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <View style={[s.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-          {/* Header */}
+        {/* Header */}
           <View style={s.header}>
             <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
               <Ionicons name="close" size={22} color="#ffffff" />
@@ -95,6 +102,13 @@ export function GroupMediaModal({
             <View style={s.centerBox}>
               <Loader size={36} color="#818cf8" />
             </View>
+          ) : isError ? (
+            <View style={s.centerBox}>
+              <Text style={s.emptyText}>Could not load shared {activeTab === 'docs' ? 'documents' : activeTab}. Please try again.</Text>
+              <Pressable accessibilityRole="button" onPress={() => void refetch()} style={{ padding: 16 }}>
+                <Text style={{ color: '#818cf8', fontWeight: '600' }}>Retry</Text>
+              </Pressable>
+            </View>
           ) : mediaItems.length === 0 ? (
             <View style={s.centerBox}>
               <Ionicons
@@ -110,15 +124,16 @@ export function GroupMediaModal({
               />
               <Text style={s.emptyText}>
                 {activeTab === 'media'
-                  ? 'No photos or videos shared in this group yet.'
+                  ? 'No photos or videos shared in this chat yet.'
                   : activeTab === 'docs'
-                    ? 'No documents shared in this group yet.'
-                    : 'No links shared in this group yet.'}
+                    ? 'No documents shared in this chat yet.'
+                    : 'No links shared in this chat yet.'}
               </Text>
             </View>
           ) : activeTab === 'media' ? (
             /* Media Grid */
             <FlatList
+              key={activeTab}
               data={mediaItems}
               numColumns={3}
               keyExtractor={(item) => item.id}
@@ -126,7 +141,7 @@ export function GroupMediaModal({
               renderItem={({ item }) => (
                 <View style={s.mediaCell}>
                   {item.type === 'IMAGE' ? (
-                    <Image source={{ uri: item.url }} style={s.mediaThumb} />
+                    <Image source={{ uri: resolveMediaUrl(item.url) }} style={s.mediaThumb} />
                   ) : (
                     <View style={s.videoCell}>
                       <Ionicons name="videocam" size={28} color="#ffffff" />
@@ -138,6 +153,7 @@ export function GroupMediaModal({
           ) : activeTab === 'docs' ? (
             /* Docs List */
             <FlatList
+              key={activeTab}
               data={mediaItems}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: 30 }}
@@ -169,6 +185,7 @@ export function GroupMediaModal({
           ) : (
             /* Links List */
             <FlatList
+              key={activeTab}
               data={mediaItems}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: 30 }}
@@ -191,7 +208,6 @@ export function GroupMediaModal({
               )}
             />
           )}
-        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -201,7 +217,6 @@ const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
   },
   header: {
     flexDirection: 'row',

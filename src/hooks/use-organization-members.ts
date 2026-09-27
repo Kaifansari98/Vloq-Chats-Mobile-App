@@ -22,7 +22,7 @@ export function useOrganizationMembers(page = 1, search = "", limit = 25) {
   return useQuery<MembersResponse>({
     queryKey: ["organization-members", page, search, limit],
     queryFn: async () => {
-      const { data } = await api.post<MembersResponse>("/users/members", {
+      const { data } = await api.post<MembersResponse>("/app/users/members", {
         page,
         limit,
         search,
@@ -36,22 +36,8 @@ export function useCreateUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { name: string; email: string; password?: string; role?: string }) => {
-      try {
-        const { data } = await api.post<{ message: string; user: Member }>("/users/create", payload);
-        return data;
-      } catch {
-        return {
-          message: "User created successfully",
-          user: {
-            id: Date.now(),
-            uuid: `user-${Date.now()}`,
-            name: payload.name,
-            email: payload.email,
-            isActive: true,
-            organizationId: 1,
-          },
-        };
-      }
+      const { data } = await api.post<{ message: string; user?: Member; data?: Member }>("/app/users/create", payload);
+      return data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["organization-members"] });

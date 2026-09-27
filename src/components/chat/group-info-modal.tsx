@@ -1,6 +1,6 @@
+import { showDialog, AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState, useMemo } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
@@ -8,12 +8,11 @@ import {
   ScrollView,
   Image,
   StyleSheet,
-  SafeAreaView,
   Platform,
   StatusBar,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -108,7 +107,7 @@ export function GroupInfoModal({
 
   function handleExitGroup() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
+    showDialog(
       'Exit Group',
       `Are you sure you want to exit "${groupName}"?`,
       [
@@ -135,6 +134,10 @@ export function GroupInfoModal({
     );
   }
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
+
   const mediaCountTotal = (groupDetails?.mediaCount ?? 0) + (groupDetails?.docsCount ?? 0) + (groupDetails?.linksCount ?? 0);
 
   return (
@@ -145,20 +148,19 @@ export function GroupInfoModal({
         statusBarTranslucent
         onRequestClose={onClose}
       >
-        <View style={s.modalContainer}>
-          <SafeAreaView style={{ flex: 1 }}>
-            <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-            
-            {/* Header bar */}
-            <View style={s.headerBar}>
-              <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
-                <Ionicons name="arrow-back" size={22} color="#ffffff" />
-              </Pressable>
+        <View style={[s.modalContainer, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-              <Text style={s.headerTitle}>Group Info</Text>
+          {/* Header bar */}
+          <View style={s.headerBar}>
+            <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
+              <Ionicons name="arrow-back" size={22} color="#ffffff" />
+            </Pressable>
 
-              <View style={{ width: 36 }} />
-            </View>
+            <Text style={s.headerTitle}>Group Info</Text>
+
+            <View style={{ width: 36 }} />
+          </View>
 
             {isLoading ? (
               <View style={s.loadingBox}>
@@ -221,7 +223,7 @@ export function GroupInfoModal({
                     Official discussion & workspace channel for {groupDetails?.name ?? groupName}.
                   </Text>
                   <Text style={s.createdInfoText}>
-                    Created on {groupDetails?.createdAt ? new Date(groupDetails.createdAt).toLocaleDateString() : 'Vloq Workspace'}
+                    Created on {groupDetails?.createdAt ? new Date(groupDetails.createdAt).toLocaleDateString() : 'ButterflyAI Workspace'}
                   </Text>
                 </View>
 
@@ -341,7 +343,6 @@ export function GroupInfoModal({
                 </View>
               </ScrollView>
             )}
-          </SafeAreaView>
         </View>
       </Modal>
 

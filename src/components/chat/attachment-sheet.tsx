@@ -1,5 +1,6 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, Modal, FlatList } from 'react-native';
+import { View, Text, Pressable, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
@@ -196,7 +197,7 @@ export function AttachmentSheet({
                 <Ionicons name="images-outline" size={28} color="rgba(255,255,255,0.35)" />
                 <Text className="mt-3 text-center text-[13px] text-white/50">
                   {permission?.accessPrivileges === 'limited'
-                    ? "You've only given Vloq Chats access to a few photos. Update access in Settings to see more here."
+                    ? "You've only given ButterflyAI access to a few photos. Update access in Settings to see more here."
                     : 'No photos found on this device.'}
                 </Text>
               </View>

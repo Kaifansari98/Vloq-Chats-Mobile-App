@@ -1,14 +1,13 @@
+import { showDialog, AppModal as Modal } from '@/components/ui/app-dialog';
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   Pressable,
-  Modal,
   TextInput,
   FlatList,
   Animated,
-  Alert,
-} from 'react-native';
+  } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/ui/Avatar';
 import { Loader } from '@/components/ui/Loader';
@@ -146,9 +145,9 @@ export function ForwardPicker({
     });
 
     try {
-      console.log('[ForwardPicker] Calling api.post /chats/forward ...');
+      console.log('[ForwardPicker] Calling api.post /app/chats/forward ...');
       const response = await api.post<{ message: string; forwardedCount: number }>(
-        '/chats/forward',
+        '/app/chats/forward',
         {
           messageUuid: message.uuid,
           targetDirectParticipantUserIds,
@@ -170,12 +169,12 @@ export function ForwardPicker({
         animateClose();
       } else {
         console.warn('[ForwardPicker] Forward response returned 0 count:', response.data);
-        Alert.alert('Forward Failed', 'Could not forward the message. Please try again.');
+        showDialog('Forward Failed', 'Could not forward the message. Please try again.');
       }
     } catch (error) {
       setIsSending(false);
       console.error('[ForwardPicker] Error during forward API call:', error);
-      Alert.alert('Forward Failed', 'Could not forward the message. Please try again.');
+      showDialog('Forward Failed', 'Could not forward the message. Please try again.');
     }
   }
 

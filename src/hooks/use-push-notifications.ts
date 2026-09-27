@@ -12,7 +12,8 @@ import { api } from '@/lib/api';
 /**
  * Storage Key for FCM Token
  */
-export const FCM_TOKEN_STORAGE_KEY = '@vloq_fcm_token';
+export const FCM_TOKEN_STORAGE_KEY = '@butterflyai_fcm_token';
+const LEGACY_FCM_TOKEN_STORAGE_KEY = '@vloq_fcm_token';
 
 /**
  * Configure foreground notification display (WhatsApp / Slack style).
@@ -154,7 +155,7 @@ async function sendPushTokenToBackend(token: string, tokenType: 'fcm' | 'expo'):
     const deviceId = getDeviceId();
     const userAgent = `${Platform.OS} ${Constants.platform?.android?.versionCode ?? ''}`.trim();
 
-    await api.post('/users/push-tokens', {
+    await api.post('/app/users/push-tokens', {
       token,
       tokenType,
       platform: Platform.OS,
@@ -255,7 +256,9 @@ export function usePushNotifications() {
         }
 
         // 2. Check AsyncStorage cache
-        const cachedToken = await AsyncStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+        const cachedToken =
+          (await AsyncStorage.getItem(FCM_TOKEN_STORAGE_KEY)) ??
+          (await AsyncStorage.getItem(LEGACY_FCM_TOKEN_STORAGE_KEY));
 
         if (cachedToken) {
           console.log('\n====================================================');
@@ -365,11 +368,11 @@ export function usePushNotifications() {
             const senderIdNum = Number(data?.senderId ?? data?.memberId ?? 0);
 
             if (isGroup && conversationUuid) {
-              api.post(`/chats/group/${conversationUuid}/messages`, { content: userReply })
+              api.post(`/app/chats/group/${conversationUuid}/messages`, { content: userReply })
                 .then(() => console.log('[FCM] Group reply sent successfully'))
                 .catch((err) => console.warn('[FCM] Group reply API error:', err));
             } else if (senderIdNum > 0) {
-              api.post('/chats/direct/messages', { participantUserId: senderIdNum, content: userReply })
+              api.post('/app/chats/direct/messages', { participantUserId: senderIdNum, content: userReply })
                 .then(() => console.log('[FCM] Direct reply sent successfully'))
                 .catch((err) => console.warn('[FCM] Direct reply API error:', err));
             }
@@ -382,7 +385,7 @@ export function usePushNotifications() {
           console.log(`[FCM] Mark read action triggered for chat: ${data?.chatId || data?.conversationId}`);
           const senderIdNum = Number(data?.senderId ?? data?.memberId ?? 0);
           if (senderIdNum > 0) {
-            api.post('/chats/direct/messages/read', { participantUserId: senderIdNum })
+            api.post('/app/chats/direct/messages/read', { participantUserId: senderIdNum })
               .then(() => console.log('[FCM] Successfully marked chat as read via notification'))
               .catch((err) => console.warn('[FCM] Mark read API error:', err));
           }
@@ -424,7 +427,7 @@ export async function deactivatePushTokenOnLogout(): Promise<void> {
     const cachedToken = await AsyncStorage.getItem(FCM_TOKEN_STORAGE_KEY);
     if (cachedToken) {
       console.log('[FCM] Deactivating push token on backend during logout...');
-      await api.post('/users/push-tokens/remove', { token: cachedToken }).catch((err) => {
+      await api.post('/app/users/push-tokens/remove', { token: cachedToken }).catch((err) => {
         console.warn('[FCM] Non-fatal: Backend token remove error:', err);
       });
       await clearFcmTokenCache();

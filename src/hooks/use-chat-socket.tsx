@@ -62,6 +62,10 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
       void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
       void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
       void queryClient.invalidateQueries({ queryKey: ["group-messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["group-media"] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-info"] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-media"] });
+      void queryClient.invalidateQueries({ queryKey: ["group-details"] });
     }
 
     function handleDirectTyping(payload: DirectTypingPayload) {

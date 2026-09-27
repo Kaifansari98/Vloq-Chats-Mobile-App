@@ -1,10 +1,10 @@
+import { showDialog } from '@/components/ui/app-dialog';
 import React, { useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   StyleSheet,
-  Alert,
   Platform,
   ScrollView,
   StatusBar,
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
       }
 
       if (finalStatus !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable notifications in your phone settings.');
+        showDialog('Permission Denied', 'Please enable notifications in your phone settings.');
         return;
       }
 
@@ -162,7 +162,7 @@ export default function SettingsScreen() {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Kaif Ansari',
-          subtitle: 'Vloq Chats',
+          subtitle: 'ButterflyAI',
           body: 'Bhai kya haal hai? Aaj raat milte hain! 🔥',
           data: { chatId: 'test-chat', senderName: 'Kaif Ansari' },
           sound: true,
@@ -177,13 +177,13 @@ export default function SettingsScreen() {
         } as any,
       });
 
-      Alert.alert(
+      showDialog(
         '✅ Notification Scheduled',
         'App ko minimize karo — 2 second mein WhatsApp jaisi notification aayegi!'
       );
     } catch (error) {
       console.error('Failed to schedule notification:', error);
-      Alert.alert('Error', String(error));
+      showDialog('Error', String(error));
     }
   }
 
@@ -288,7 +288,7 @@ export default function SettingsScreen() {
           <TappableRow
             icon="information-circle-outline"
             title="App Version"
-            subtitle="Vloq Chats v1.0.0"
+            subtitle="ButterflyAI v1.0.0"
             onPress={() => {}}
             showDivider={false}
             trailing={<Text style={styles.versionText}>v1.0.0</Text>}

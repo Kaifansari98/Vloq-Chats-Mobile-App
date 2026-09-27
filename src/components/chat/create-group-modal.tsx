@@ -1,6 +1,6 @@
+import { AppModal as Modal } from '@/components/ui/app-dialog';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
@@ -10,13 +10,13 @@ import {
   ActivityIndicator,
   Image,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
   Animated,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrganizationMembers, Member } from '@/hooks/use-organization-members';
 import { useCreateGroupChat } from '@/hooks/use-group-chats';
@@ -227,6 +227,10 @@ export function CreateGroupModal({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
+  const bottomInset = Math.max(insets.bottom, 16);
+
   return (
     <Modal
       visible={visible}
@@ -239,14 +243,13 @@ export function CreateGroupModal({
         <Animated.View
           style={[
             s.root,
-            { transform: [{ translateX: slideAnim }] },
+            { paddingTop: topInset, paddingBottom: bottomInset, transform: [{ translateX: slideAnim }] },
           ]}
         >
-          <SafeAreaView style={{ flex: 1 }}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={{ flex: 1 }}
-            >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+          >
               {/* ───── Step 1: Select Members ───── */}
               {step === 'select' ? (
                 <View style={{ flex: 1 }}>
@@ -515,7 +518,6 @@ export function CreateGroupModal({
                 </View>
               )}
             </KeyboardAvoidingView>
-          </SafeAreaView>
         </Animated.View>
       </View>
     </Modal>
