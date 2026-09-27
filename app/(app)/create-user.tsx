@@ -48,8 +48,8 @@ export default function CreateUserScreen() {
       return;
     }
 
-    if (!password.trim() || password.length < 4) {
-      showDialog('Invalid Password', 'Password must be at least 4 characters long.');
+    if (!password.trim() || password.length < 6) {
+      showDialog('Invalid Password', 'Password must be at least 6 characters long.');
       return;
     }
 
@@ -71,14 +71,24 @@ export default function CreateUserScreen() {
             text: 'OK',
             onPress: handleBack,
           },
-        ]
+        ],
+        {
+          autoDismissMs: 3000,
+        }
       );
     } catch (err: any) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showDialog(
-        'Failed to Create User',
-        err?.response?.data?.message || err?.message || 'Could not register user. Please try again.'
-      );
+      let rawMsg = err?.response?.data?.message;
+      if (typeof rawMsg === 'object' && rawMsg !== null) {
+        const errorObj = rawMsg as { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
+        const firstFieldError = errorObj.fieldErrors ? Object.values(errorObj.fieldErrors)?.[0]?.[0] : undefined;
+        rawMsg = firstFieldError || errorObj.formErrors?.[0] || JSON.stringify(rawMsg);
+      }
+      const errorMsg = typeof rawMsg === 'string' && rawMsg.length > 0
+        ? rawMsg
+        : err?.message || 'Could not register user. Please try again.';
+
+      showDialog('Failed to Create User', errorMsg);
     }
   }
 
@@ -234,6 +244,15 @@ export default function CreateUserScreen() {
                   </>
                 )}
               </LinearGradient>
+            </Pressable>
+
+            {/* Cancel Button */}
+            <Pressable
+              onPress={handleBack}
+              disabled={createUserMutation.isPending}
+              style={s.cancelBtn}
+            >
+              <Text style={s.cancelBtnText}>Cancel</Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -394,5 +413,20 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  cancelBtn: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });

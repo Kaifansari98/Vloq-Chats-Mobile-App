@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DialogButton = { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void };
-type DialogOptions = { cancelable?: boolean; onDismiss?: () => void };
+type DialogOptions = { cancelable?: boolean; onDismiss?: () => void; autoDismissMs?: number };
 type Dialog = { title: string; message?: string; buttons: DialogButton[]; options: DialogOptions };
 const queue: Dialog[] = [];
 const hosts: symbol[] = [];
@@ -17,8 +17,28 @@ function useDialogState() { useSyncExternalStore(subscribe, () => revision, () =
 /** Shared app confirmation/message sheet. Requests are queued so messages never overwrite each other. */
 export function showDialog(title: string, message?: string, buttons?: DialogButton[], options: DialogOptions = {}) {
   Keyboard.dismiss();
-  queue.push({ title, message, buttons: buttons?.length ? buttons : [{ text: 'OK' }], options });
+  const dialogItem: Dialog = { title, message, buttons: buttons?.length ? buttons : [{ text: 'OK' }], options };
+  queue.push(dialogItem);
   emit();
+
+  if (options.autoDismissMs && options.autoDismissMs > 0) {
+    setTimeout(() => {
+      const index = queue.indexOf(dialogItem);
+      if (index !== -1) {
+        queue.splice(index, 1);
+        emit();
+        dialogItem.buttons[0]?.onPress?.();
+      }
+    }, options.autoDismissMs);
+  }
+}
+export function dismissCurrentDialog(executeFirstButtonPress = true) {
+  const dialog = queue.shift();
+  if (!dialog) return;
+  emit();
+  if (executeFirstButtonPress) {
+    dialog.buttons[0]?.onPress?.();
+  }
 }
 function choose(dialog: Dialog, button: DialogButton) {
   if (queue[0] !== dialog) return;

@@ -96,7 +96,33 @@ export function UserInfoModal({
 
           <Pressable
             onPress={() => {
-              showDialog('Chat Options', 'More options coming soon!');
+              void Haptics.selectionAsync();
+              showDialog(
+                'Chat Options',
+                undefined,
+                [
+                  {
+                    text: 'View Media & Docs',
+                    onPress: () => setMediaVisible(true),
+                  },
+                  {
+                    text: isMuted ? 'Unmute Notifications' : 'Mute Notifications',
+                    onPress: () => {
+                      setIsMuted(!isMuted);
+                      void Haptics.selectionAsync();
+                    },
+                  },
+                  {
+                    text: 'Close Info',
+                    onPress: onClose,
+                  },
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                  },
+                ],
+                { cancelable: true }
+              );
             }}
             hitSlop={10}
             style={s.iconBtn}

@@ -11,6 +11,10 @@ const productionApiUrl = "https://api-chat.butterflyai.io/";
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
 function getLocalApiUrl(): string {
+  if (configuredApiUrl) {
+    return configuredApiUrl.endsWith("/") ? configuredApiUrl : `${configuredApiUrl}/`;
+  }
+
   const hostUri =
     Constants.expoConfig?.hostUri ||
     (Constants as Record<string, any>).manifest?.debuggerHost ||
@@ -23,7 +27,7 @@ function getLocalApiUrl(): string {
     }
   }
 
-  return configuredApiUrl || "http://192.168.1.105:4000/";
+  return "http://10.19.114.117:4000/";
 }
 
 export const API_BASE_URL =
