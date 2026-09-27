@@ -153,13 +153,11 @@ export function GroupInfoModal({
 
           {/* Header bar */}
           <View style={s.headerBar}>
-            <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
-              <Ionicons name="arrow-back" size={22} color="#ffffff" />
-            </Pressable>
-
             <Text style={s.headerTitle}>Group Info</Text>
 
-            <View style={{ width: 36 }} />
+            <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
+              <Ionicons name="close" size={22} color="#ffffff" />
+            </Pressable>
           </View>
 
             {isLoading ? (

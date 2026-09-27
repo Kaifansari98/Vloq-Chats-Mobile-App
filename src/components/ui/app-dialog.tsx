@@ -75,8 +75,24 @@ function DialogSheet() {
           {!!dialog.message && <Text style={styles.message}>{String(dialog.message)}</Text>}
           <View style={[styles.actions, dialog.buttons.length > 2 && styles.stacked]}>
             {dialog.buttons.map((button, index) => (
-              <Pressable key={index} accessibilityRole="button" onPress={() => choose(dialog, button)} style={({ pressed }) => [styles.button, { backgroundColor: button.style === 'cancel' ? '#ffffff1a' : button.style === 'destructive' ? '#dc2626' : '#bdbdbd', opacity: pressed ? 0.7 : 1 }]}>
-                <Text style={[styles.buttonText, { color: button.style === 'cancel' || button.style === 'destructive' ? '#ffffff' : '#0a0a0a' }]}>{button.text}</Text>
+              <Pressable
+                key={index}
+                accessibilityRole="button"
+                onPress={() => choose(dialog, button)}
+                style={({ pressed }) => [
+                  styles.button,
+                  {
+                    backgroundColor:
+                      button.style === 'cancel'
+                        ? 'rgba(255, 255, 255, 0.12)'
+                        : button.style === 'destructive'
+                        ? '#dc2626'
+                        : '#6366f1',
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.buttonText, { color: '#ffffff' }]}>{button.text}</Text>
               </Pressable>
             ))}
           </View>

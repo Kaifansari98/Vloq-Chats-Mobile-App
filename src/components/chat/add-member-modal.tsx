@@ -89,16 +89,14 @@ export function AddMemberModal({
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
         {/* Header */}
-          <View style={s.header}>
-            <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
-              <Ionicons name="close" size={22} color="#ffffff" />
-            </Pressable>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={s.headerTitle}>Add Members</Text>
-              <Text style={s.headerSubtitle} numberOfLines={1}>
-                {groupName} · {selectedIds.length} selected
-              </Text>
-            </View>
+        <View style={s.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.headerTitle}>Add Members</Text>
+            <Text style={s.headerSubtitle} numberOfLines={1}>
+              {groupName} · {selectedIds.length} selected
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Pressable
               onPress={() => void handleAdd()}
               disabled={selectedIds.length === 0 || addMembersMutation.isPending}
@@ -113,7 +111,12 @@ export function AddMemberModal({
                 <Text style={s.addBtnText}>Add</Text>
               )}
             </Pressable>
+
+            <Pressable onPress={onClose} hitSlop={10} style={s.iconBtn}>
+              <Ionicons name="close" size={22} color="#ffffff" />
+            </Pressable>
           </View>
+        </View>
 
           {/* Search bar */}
           <View style={s.searchBox}>

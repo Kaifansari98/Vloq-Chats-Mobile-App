@@ -109,165 +109,163 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
       onRequestClose={handleClose}
     >
       <View style={[s.container, { paddingTop: topInset, paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <StatusBar barStyle="light-content" backgroundColor="#111111" translucent />
+        <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent />
 
         {/* Header Bar */}
-          <View style={s.header}>
-            <Pressable onPress={handleClose} hitSlop={12} style={s.closeBtn}>
-              <Ionicons name="close" size={20} color="#ffffff" />
-            </Pressable>
-            <View style={s.headerTitleBox}>
-              <Text style={s.headerTitle}>Create New User</Text>
-              <Text style={s.headerSubtitle}>Admin Portal</Text>
+        <View style={s.header}>
+          <View style={s.headerTitleBox}>
+            <Text style={s.headerTitle}>Create New User</Text>
+            <View style={s.badgePill}>
+              <Text style={s.headerSubtitle}>ADMIN PORTAL</Text>
             </View>
-            <View style={{ width: 36 }} />
           </View>
-
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          <Pressable
+            onPress={handleClose}
+            hitSlop={12}
+            style={({ pressed }) => [s.closeBtn, pressed && { opacity: 0.7 }]}
           >
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+            <Ionicons name="close" size={22} color="#ffffff" />
+          </Pressable>
+        </View>
+
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Hero Banner Card */}
+            <View style={s.heroCard}>
+              <LinearGradient
+                colors={['#4f46e5', '#6366f1']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.heroIconBox}
+              >
+                <Ionicons name="person-add-outline" size={26} color="#ffffff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={s.heroTitle}>New Team Member</Text>
+                <Text style={s.heroSubtitle}>
+                  Register a new user to join your ButterflyAI workspace.
+                </Text>
+              </View>
+            </View>
+
+            {/* Form Card Container */}
+            <View style={s.formCard}>
+              {/* Full Name */}
+              <View style={s.formGroup}>
+                <Text style={s.label}>FULL NAME *</Text>
+                <View style={s.inputWrapper}>
+                  <Ionicons name="person-outline" size={18} color="#818cf8" style={s.inputIcon} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="e.g. Rahul Sharma"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
+              {/* Email Address */}
+              <View style={s.formGroup}>
+                <Text style={s.label}>EMAIL ADDRESS *</Text>
+                <View style={s.inputWrapper}>
+                  <Ionicons name="mail-outline" size={18} color="#818cf8" style={s.inputIcon} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="e.g. rahul@butterflyai.com"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* Initial Password */}
+              <View style={s.formGroup}>
+                <Text style={s.label}>TEMPORARY PASSWORD *</Text>
+                <View style={s.inputWrapper}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#818cf8" style={s.inputIcon} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="Set initial password"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                  />
+                </View>
+              </View>
+
+              {/* Role Selector */}
+              <View style={{ marginTop: 4 }}>
+                <Text style={s.label}>USER ROLE</Text>
+                <View style={s.roleSelector}>
+                  <Pressable
+                    onPress={() => setRole('MEMBER')}
+                    style={[s.roleOption, role === 'MEMBER' && s.roleOptionActive]}
+                  >
+                    <Ionicons
+                      name="person-outline"
+                      size={18}
+                      color={role === 'MEMBER' ? '#ffffff' : 'rgba(255,255,255,0.5)'}
+                    />
+                    <Text style={[s.roleText, role === 'MEMBER' && s.roleTextActive]}>
+                      Member
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setRole('ADMIN')}
+                    style={[s.roleOption, role === 'ADMIN' && s.roleOptionActive]}
+                  >
+                    <Ionicons
+                      name="shield-checkmark-outline"
+                      size={18}
+                      color={role === 'ADMIN' ? '#ffffff' : 'rgba(255,255,255,0.5)'}
+                    />
+                    <Text style={[s.roleText, role === 'ADMIN' && s.roleTextActive]}>
+                      Admin
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* Submit Button */}
+            <Pressable
+              onPress={handleSubmit}
+              disabled={createUserMutation.isPending}
+              style={({ pressed }) => [s.submitContainer, pressed && { opacity: 0.9 }]}
             >
-              {/* Hero Banner Card */}
-              <View style={s.heroCard}>
-                <LinearGradient
-                  colors={['#3a3d3c', '#242625']}
-                  style={s.heroIconBox}
-                >
-                  <Ionicons name="person-add-outline" size={26} color="#ffffff" />
-                </LinearGradient>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.heroTitle}>New Team Member</Text>
-                  <Text style={s.heroSubtitle}>
-                    Register a new user to join your ButterflyAI workspace.
-                  </Text>
-                </View>
-              </View>
-
-              {/* Form Card Container */}
-              <View style={s.formCard}>
-                {/* Full Name */}
-                <View style={s.formGroup}>
-                  <Text style={s.label}>FULL NAME *</Text>
-                  <View style={s.inputWrapper}>
-                    <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" style={s.inputIcon} />
-                    <TextInput
-                      style={s.input}
-                      placeholder="e.g. Rahul Sharma"
-                      placeholderTextColor="rgba(255,255,255,0.35)"
-                      value={name}
-                      onChangeText={setName}
-                      autoCapitalize="words"
-                    />
-                  </View>
-                </View>
-
-                {/* Email Address */}
-                <View style={s.formGroup}>
-                  <Text style={s.label}>EMAIL ADDRESS *</Text>
-                  <View style={s.inputWrapper}>
-                    <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.4)" style={s.inputIcon} />
-                    <TextInput
-                      style={s.input}
-                      placeholder="e.g. rahul@butterflyai.com"
-                      placeholderTextColor="rgba(255,255,255,0.35)"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </View>
-
-                {/* Initial Password */}
-                <View style={s.formGroup}>
-                  <Text style={s.label}>TEMPORARY PASSWORD *</Text>
-                  <View style={s.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={18} color="rgba(255,255,255,0.4)" style={s.inputIcon} />
-                    <TextInput
-                      style={s.input}
-                      placeholder="Set initial password"
-                      placeholderTextColor="rgba(255,255,255,0.35)"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                    />
-                  </View>
-                </View>
-
-                {/* Role Selector */}
-                <View style={{ marginTop: 4 }}>
-                  <Text style={s.label}>USER ROLE</Text>
-                  <View style={s.roleSelector}>
-                    <Pressable
-                      onPress={() => setRole('MEMBER')}
-                      style={[s.roleOption, role === 'MEMBER' && s.roleOptionActive]}
-                    >
-                      <Ionicons
-                        name="person-outline"
-                        size={18}
-                        color={role === 'MEMBER' ? '#ffffff' : 'rgba(255,255,255,0.5)'}
-                      />
-                      <Text style={[s.roleText, role === 'MEMBER' && s.roleTextActive]}>
-                        Member
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => setRole('ADMIN')}
-                      style={[s.roleOption, role === 'ADMIN' && s.roleOptionActive]}
-                    >
-                      <Ionicons
-                        name="shield-checkmark-outline"
-                        size={18}
-                        color={role === 'ADMIN' ? '#ffffff' : 'rgba(255,255,255,0.5)'}
-                      />
-                      <Text style={[s.roleText, role === 'ADMIN' && s.roleTextActive]}>
-                        Admin
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-
-              {/* Submit Button */}
-              <Pressable
-                onPress={handleSubmit}
-                disabled={createUserMutation.isPending}
-                style={s.submitContainer}
+              <LinearGradient
+                colors={['#4f46e5', '#6366f1']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.submitGradient}
               >
-                <LinearGradient
-                  colors={['#3a3d3c', '#242625']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.submitGradient}
-                >
-                  {createUserMutation.isPending ? (
-                    <ActivityIndicator color="#ffffff" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />
-                      <Text style={s.submitBtnText}>Create User Account</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </Pressable>
-
-              {/* Close / Cancel Button */}
-              <Pressable
-                onPress={handleClose}
-                disabled={createUserMutation.isPending}
-                style={s.cancelBtn}
-              >
-                <Text style={s.cancelBtnText}>Cancel</Text>
-              </Pressable>
-            </ScrollView>
-          </KeyboardAvoidingView>
+                {createUserMutation.isPending ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />
+                    <Text style={s.submitBtnText}>Create User Account</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -276,109 +274,125 @@ export function CreateUserModal({ visible, onClose }: CreateUserModalProps) {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: '#0b0f19',
   },
   header: {
-    height: 52,
+    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#0b0f19',
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   headerTitleBox: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: -0.3,
+  },
+  badgePill: {
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   headerSubtitle: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 1,
+    fontSize: 9,
+    color: '#818cf8',
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   heroCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    gap: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 16,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
   },
   heroIconBox: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
   heroTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   heroSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-    lineHeight: 16,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.65)',
+    lineHeight: 18,
   },
   formCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 24,
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   label: {
     fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '800',
+    color: '#818cf8',
     letterSpacing: 0.8,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 50,
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#ffffff',
   },
   roleSelector: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
   roleOption: {
     flex: 1,
@@ -389,12 +403,12 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
   },
   roleOptionActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(99, 102, 241, 0.22)',
+    borderColor: '#6366f1',
   },
   roleText: {
     fontSize: 14,
@@ -403,43 +417,27 @@ const s = StyleSheet.create({
   },
   roleTextActive: {
     color: '#ffffff',
+    fontWeight: '700',
   },
   submitContainer: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 10,
+    elevation: 8,
   },
   submitGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 15,
+    paddingVertical: 16,
   },
   submitBtnText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
-  },
-  cancelBtn: {
-    marginTop: 12,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  cancelBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
   },
 });
