@@ -22,7 +22,7 @@ export function useOrganizationMembers(page = 1, search = "", limit = 25) {
   return useQuery<MembersResponse>({
     queryKey: ["organization-members", page, search, limit],
     queryFn: async () => {
-      const { data } = await api.post<MembersResponse>("/users/members", {
+      const { data } = await api.post<MembersResponse>("/app/users/members", {
         page,
         limit,
         search,
@@ -37,7 +37,7 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: async (payload: { name: string; email: string; password?: string; role?: string }) => {
       try {
-        const { data } = await api.post<{ message: string; user: Member }>("/users/create", payload);
+        const { data } = await api.post<{ message: string; user: Member }>("/app/users/create", payload);
         return data;
       } catch {
         return {

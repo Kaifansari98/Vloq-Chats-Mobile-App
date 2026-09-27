@@ -14,7 +14,7 @@ export function useDirectInfo(participantUserId: number | undefined, visible: bo
     queryKey: ['direct-info', participantUserId],
     enabled: visible && Number.isSafeInteger(participantUserId) && (participantUserId ?? 0) > 0,
     queryFn: async () => {
-      const { data } = await api.get<{ data: DirectInfo }>(`/chats/direct/${participantUserId}/info`);
+      const { data } = await api.get<{ data: DirectInfo }>(`/app/chats/direct/${participantUserId}/info`);
       return data.data;
     },
   });

@@ -11,7 +11,7 @@ export function useGroupMessages(conversationUuid?: string) {
     enabled: typeof conversationUuid === "string" && conversationUuid.length > 0,
     queryFn: async () => {
       const { data } = await api.get<GroupMessagesResponse>(
-        `/chats/group/${conversationUuid}/messages`
+        `/app/chats/group/${conversationUuid}/messages`
       );
       return data;
     },
@@ -29,7 +29,7 @@ export function useSendGroupMessage(conversationUuid?: string) {
       replyToMessageUuid?: string;
     }) => {
       const { data } = await api.post<SendGroupMessageResponse>(
-        `/chats/group/${conversationUuid}/messages`,
+        `/app/chats/group/${conversationUuid}/messages`,
         { content, ...(replyToMessageUuid && { replyToMessageUuid }) }
       );
       return data;
@@ -65,7 +65,7 @@ export function useUploadGroupMessage(conversationUuid?: string) {
         } as unknown as Blob);
       }
       const { data } = await api.post<SendGroupMessageResponse>(
-        `/chats/group/${conversationUuid}/messages/upload`,
+        `/app/chats/group/${conversationUuid}/messages/upload`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -89,7 +89,7 @@ export function useEditGroupMessage(conversationUuid?: string) {
       content: string;
     }) => {
       const { data } = await api.put<SendGroupMessageResponse>(
-        `/chats/app/group/${conversationUuid}/messages/${messageUuid}`,
+        `/app/chats/group/${conversationUuid}/messages/${messageUuid}`,
         { content }
       );
       return data;

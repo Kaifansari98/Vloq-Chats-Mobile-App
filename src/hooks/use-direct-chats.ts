@@ -68,7 +68,7 @@ export function useDirectChats(
   return useQuery<DirectChatsResponse>({
     queryKey: ["direct-chats", page, search, filter],
     queryFn: async () => {
-      const { data } = await api.get<DirectChatsResponse>("/chats/direct", {
+      const { data } = await api.get<DirectChatsResponse>("/app/chats/direct", {
         params: { page, limit: 50, search, filter },
       });
       return data;

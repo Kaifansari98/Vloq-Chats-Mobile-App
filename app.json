@@ -27,12 +27,11 @@
       "backgroundColor": "#111111",
       "predictiveBackGestureEnabled": false,
       "package": "com.vloq.chats",
-      "softwareKeyboardLayoutMode": "resize",
-      "androidNavigationBar": {
-        "visible": "always",
-        "barStyle": "light-content",
-        "backgroundColor": "#111111"
-      }
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#111111"
     },
     "web": {
       "favicon": "./assets/favicon.png",

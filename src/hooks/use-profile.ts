@@ -22,7 +22,7 @@ export function useFetchUserProfile() {
     queryKey: ["user-profile"],
     queryFn: async () => {
       try {
-        const { data } = await api.get<{ data: AuthenticatedUser }>("/users/me");
+        const { data } = await api.get<{ data: AuthenticatedUser }>("/app/users/me");
         if (data?.data) {
           const currentUser = await getUser<AuthenticatedUser>();
           const updated = { ...currentUser, ...data.data };
@@ -53,18 +53,18 @@ export function useUploadProfilePic() {
         type: fileType,
       } as unknown as Blob);
 
-      // Try POST /users/me/profile-pic endpoint
+      // Try POST /app/users/me/profile-pic endpoint
       try {
         const { data } = await api.post<UploadProfilePicResponse>(
-          "/users/me/profile-pic",
+          "/app/users/me/profile-pic",
           formData,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
         return data;
       } catch {
-        // Fallback endpoint POST /users/profile-pic
+        // Fallback endpoint POST /app/users/profile-pic
         const { data } = await api.post<UploadProfilePicResponse>(
-          "/users/profile-pic",
+          "/app/users/profile-pic",
           formData,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
@@ -96,10 +96,10 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: async ({ name, uuid }: { name: string; uuid?: string }) => {
       try {
-        const { data } = await api.patch<UpdateProfileResponse>(`/users/${uuid || 'me'}`, { name });
+        const { data } = await api.patch<UpdateProfileResponse>(`/app/users/${uuid || 'me'}`, { name });
         return data;
       } catch {
-        const { data } = await api.put<UpdateProfileResponse>("/users/me", { name });
+        const { data } = await api.put<UpdateProfileResponse>("/app/users/me", { name });
         return data;
       }
     },

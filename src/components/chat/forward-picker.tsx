@@ -145,9 +145,9 @@ export function ForwardPicker({
     });
 
     try {
-      console.log('[ForwardPicker] Calling api.post /chats/app/forward ...');
+      console.log('[ForwardPicker] Calling api.post /app/chats/forward ...');
       const response = await api.post<{ message: string; forwardedCount: number }>(
-        '/chats/app/forward',
+        '/app/chats/forward',
         {
           messageUuid: message.uuid,
           targetDirectParticipantUserIds,

@@ -62,7 +62,7 @@ export function useDirectMessages(participantUserId?: number) {
     enabled: typeof participantUserId === "number",
     queryFn: async () => {
       const { data } = await api.get<DirectMessagesResponse>(
-        "/chats/direct/messages",
+        "/app/chats/direct/messages",
         { params: { participantUserId } }
       );
       return data;
@@ -81,7 +81,7 @@ export function useSendDirectMessage(participantUserId?: number) {
       replyToMessageUuid?: string;
     }) => {
       const { data } = await api.post<SendDirectMessageResponse>(
-        "/chats/direct/messages",
+        "/app/chats/direct/messages",
         {
           participantUserId,
           content,
@@ -124,7 +124,7 @@ export function useUploadDirectMessage(participantUserId?: number) {
         } as unknown as Blob);
       }
       const { data } = await api.post<SendDirectMessageResponse>(
-        "/chats/direct/messages/upload",
+        "/app/chats/direct/messages/upload",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -144,7 +144,7 @@ export function useMarkDirectChatRead() {
   return useMutation({
     mutationFn: async (participantUserId: number) => {
       const { data } = await api.post<{ message: string }>(
-        "/chats/direct/messages/read",
+        "/app/chats/direct/messages/read",
         { participantUserId }
       );
       return data;
@@ -169,7 +169,7 @@ export function useEditDirectMessage(participantUserId?: number) {
       content: string;
     }) => {
       const { data } = await api.put<SendDirectMessageResponse>(
-        `/chats/app/direct/messages/${messageUuid}`,
+        `/app/chats/direct/messages/${messageUuid}`,
         { content }
       );
       return data;
@@ -213,7 +213,7 @@ export function useRequestTranscription() {
   return useMutation({
     mutationFn: async (attachmentUuid: string) => {
       const { data } = await api.post<{ message: string }>(
-        `/chats/transcribe/${attachmentUuid}`
+        `/app/chats/transcribe/${attachmentUuid}`
       );
       return data;
     },

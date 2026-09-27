@@ -23,7 +23,7 @@ export function MessageSearch({ isGroup, conversationUuid, memberId, onClose, on
     initialPageParam: 1,
     enabled: query.length > 0,
     queryFn: async ({ pageParam, signal }) => {
-      const { data } = await api.get<SearchResponse>(isGroup ? `/chats/group/${conversationUuid}/messages/search` : '/chats/direct/messages/search', {
+      const { data } = await api.get<SearchResponse>(isGroup ? `/app/chats/group/${conversationUuid}/messages/search` : '/app/chats/direct/messages/search', {
         params: { q: query, page: pageParam, limit: 25, ...(!isGroup && { participantUserId: memberId }) }, signal,
       });
       return data;

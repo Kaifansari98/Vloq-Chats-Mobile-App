@@ -27,7 +27,9 @@ function getLocalApiUrl(): string {
 }
 
 export const API_BASE_URL =
-  environment === "LOCAL" ? getLocalApiUrl() : productionApiUrl;
+  environment === "LOCAL"
+    ? getLocalApiUrl()
+    : (configuredApiUrl || productionApiUrl);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -51,7 +53,7 @@ api.interceptors.response.use(
   async (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const url = error.config?.url ?? "";
-      const isAuthEndpoint = url.includes("/auth/");
+      const isAuthEndpoint = url.includes("/auth/") || url.includes("/app/auth/");
       if (!isAuthEndpoint) {
         await clearAuth();
         router.replace("/(auth)/login");
@@ -73,13 +75,10 @@ export function resolveMediaUrl(url?: string | null): string {
     return `${baseUrl}/${url}`;
   }
 
-  // If running in LOCAL mode, rewrite any host/IP pointing to port 4000
-  // e.g. http://192.168.0.131:4000/assets/... or http://localhost:4000/assets/...
-  if (environment === "LOCAL") {
-    const localPortMatch = url.match(/^http:\/\/[^/:]+:4000(\/.*)?$/);
-    if (localPortMatch) {
-      return `${baseUrl}${localPortMatch[1] || ""}`;
-    }
+  // If URL has local port 4000 / localhost / local IP, rewrite to active baseUrl
+  const localPortMatch = url.match(/^http:\/\/[^/:]+:(?:4000|3000|8000)(\/.*)?$/);
+  if (localPortMatch) {
+    return `${baseUrl}${localPortMatch[1] || ""}`;
   }
 
   return url;
